@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-ui-init"
+description = "Enables the ui_init command without any pre-configured scope."
+commands.allow = ["ui_init"]
+
+[[permission]]
+identifier = "deny-ui-init"
+description = "Denies the ui_init command without any pre-configured scope."
+commands.deny = ["ui_init"]

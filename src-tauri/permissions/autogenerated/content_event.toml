@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-content-event"
+description = "Enables the content_event command without any pre-configured scope."
+commands.allow = ["content_event"]
+
+[[permission]]
+identifier = "deny-content-event"
+description = "Denies the content_event command without any pre-configured scope."
+commands.deny = ["content_event"]

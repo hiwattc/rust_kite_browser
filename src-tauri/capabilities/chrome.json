@@ -1,0 +1,26 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "chrome",
+  "description": "The browser's own pages: tab strip/toolbar (ui) and the spotlight palette",
+  "webviews": ["ui", "palette"],
+  "permissions": [
+    "core:default",
+    "core:window:allow-start-dragging",
+    "core:window:allow-internal-toggle-maximize",
+    "allow-ui-init",
+    "allow-shortcut",
+    "allow-tab-new",
+    "allow-tab-close",
+    "allow-tab-activate",
+    "allow-tab-move",
+    "allow-navigate",
+    "allow-set-chrome-height",
+    "allow-palette-open",
+    "allow-palette-close",
+    "allow-palette-resize",
+    "allow-palette-search",
+    "allow-palette-run",
+    "allow-toggle-bookmark",
+    "allow-mcp-info"
+  ]
+}

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-palette-open"
+description = "Enables the palette_open command without any pre-configured scope."
+commands.allow = ["palette_open"]
+
+[[permission]]
+identifier = "deny-palette-open"
+description = "Denies the palette_open command without any pre-configured scope."
+commands.deny = ["palette_open"]

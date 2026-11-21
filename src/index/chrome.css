@@ -1,0 +1,74 @@
+body { height: auto; background: var(--bg-toolbar); }
+
+/* ---- tab strip ---- */
+.strip { height: var(--strip-h); display: flex; align-items: flex-end; background: var(--bg-strip); padding: 0 6px 0 8px; gap: 2px; }
+.traffic { display: none; width: 72px; height: 100%; flex: none; }
+:root[data-platform="mac"] .traffic { display: block; }
+.tabs { display: flex; align-items: flex-end; min-width: 0; flex: 0 1 auto; gap: 1px; height: 100%; padding-top: 6px; }
+.tab {
+  position: relative; display: flex; align-items: center; gap: 7px; height: 32px; padding: 0 6px 0 10px;
+  min-width: var(--tab-min); max-width: var(--tab-max); flex: 1 1 var(--tab-max);
+  border-radius: var(--radius) var(--radius) 0 0; color: var(--text-dim); transition: background .12s;
+}
+.tab:hover { background: var(--bg-tab-hover); }
+.tab.active { background: var(--bg-tab-active); color: var(--text); }
+.tab + .tab:not(.active):not(:hover)::before { content: ""; position: absolute; left: -1px; top: 9px; bottom: 9px; width: 1px; background: var(--border-strong); }
+.tab.active + .tab::before, .tab:hover + .tab::before { display: none; }
+.tab.agent-tab { box-shadow: inset 0 2px 0 var(--accent); }
+.tab .title { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 12px; }
+.fav, .fav-ph, .spinner { width: 16px; height: 16px; flex: none; border-radius: 3px; }
+.fav-ph { color: var(--text-faint); }
+.spinner { border: 2px solid var(--accent-soft); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.tab-bot { color: var(--accent); flex: none; }
+.tab-bot .icon { width: 14px; height: 14px; }
+.tab-close { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; flex: none; color: var(--text-faint); opacity: 0; }
+.tab:hover .tab-close, .tab.active .tab-close { opacity: 1; }
+.tab-close:hover { background: var(--bg-press); color: var(--text); }
+.tab-close .icon { width: 12px; height: 12px; stroke-width: 2.2; }
+.tab:not(.active) { min-width: 40px; }
+.strip-btn { width: 28px; height: 28px; margin: 0 2px 2px; border-radius: 50%; display: grid; place-items: center; flex: none; color: var(--text-dim); }
+.strip-btn:hover { background: var(--bg-hover); }
+.strip-fill { flex: 1; height: 100%; }
+
+/* ---- toolbar ---- */
+.toolbar { height: var(--toolbar-h); display: flex; align-items: center; gap: 2px; padding: 0 8px; background: var(--bg-toolbar); border-bottom: 1px solid var(--border); position: relative; }
+.tb { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; color: var(--text-dim); flex: none; }
+.tb:hover { background: var(--bg-hover); color: var(--text); }
+.tb:active { background: var(--bg-press); }
+.omni { flex: 1; min-width: 120px; height: 32px; margin: 0 6px; display: flex; align-items: center; gap: 6px; padding: 0 4px 0 12px; border-radius: 16px; background: var(--bg-input); border: 1px solid transparent; }
+.omni:focus-within { background: var(--bg-input-focus); border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.omni-icon { color: var(--text-faint); flex: none; }
+.omni-icon .icon { width: 14px; height: 14px; }
+.omni input { flex: 1; min-width: 0; height: 100%; border: 0; outline: 0; background: transparent; font-size: 13.5px; user-select: text; -webkit-user-select: text; }
+.omni input::placeholder { color: var(--text-faint); }
+.omni-btn { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; color: var(--text-faint); flex: none; }
+.omni-btn:hover { background: var(--bg-hover); color: var(--text); }
+.omni-btn[disabled] { opacity: .35; pointer-events: none; }
+#star.on { color: var(--accent); }
+#star.on .icon { fill: currentColor; }
+.zoom { font-size: 11px; color: var(--text-dim); padding: 2px 6px; border-radius: 8px; background: var(--bg-hover); }
+.mcp { display: flex; align-items: center; gap: 5px; height: 24px; padding: 0 9px; border-radius: 12px; font-size: 11px; font-weight: 600; letter-spacing: .3px; color: var(--text-faint); flex: none; }
+.mcp:hover { background: var(--bg-hover); }
+.mcp .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-faint); }
+.mcp.on { color: var(--text-dim); }
+.mcp.on .dot { background: var(--ok); box-shadow: 0 0 0 3px rgba(24, 160, 88, .18); }
+.agent { display: flex; align-items: center; gap: 5px; height: 24px; padding: 0 10px 0 7px; border-radius: 12px; background: var(--accent-soft); color: var(--accent); font-size: 11.5px; font-weight: 600; flex: none; }
+.agent .icon { width: 14px; height: 14px; }
+.agent.pulse { animation: pulse 1s ease-out; }
+@keyframes pulse { 0% { box-shadow: 0 0 0 0 var(--accent-soft); } 100% { box-shadow: 0 0 0 8px transparent; } }
+.toast { position: absolute; right: 150px; top: 8px; max-width: 46%; height: 28px; line-height: 28px; padding: 0 12px; border-radius: 14px; background: var(--text); color: var(--bg-toolbar); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; box-shadow: var(--shadow); z-index: 5; animation: fade .18s ease-out; }
+@keyframes fade { from { opacity: 0; transform: translateY(-3px); } }
+/* ---- bookmark bar ---- */
+.bbar { height: 30px; display: flex; align-items: center; gap: 4px; padding: 0 8px; background: var(--bg-toolbar); border-bottom: 1px solid var(--border); }
+.bb-items { flex: 1; min-width: 0; display: flex; align-items: center; gap: 2px; overflow: hidden; }
+.bb { display: flex; align-items: center; gap: 6px; height: 24px; max-width: 180px; padding: 0 8px; border-radius: 12px; color: var(--text-dim); font-size: 12px; flex: none; }
+.bb span:last-child { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.bb:hover { background: var(--bg-hover); color: var(--text); }
+.bb:active { background: var(--bg-press); }
+.bb-ic { width: 14px; height: 14px; flex: none; border-radius: 3px; color: var(--text-faint); display: grid; place-items: center; }
+.bb-ic .icon { width: 14px; height: 14px; }
+.bb-more { font-size: 15px; padding: 0 8px; color: var(--text-faint); }
+.bb-all { border-left: 1px solid var(--border); border-radius: 0 12px 12px 0; padding-left: 10px; }
+.bb-empty { color: var(--text-faint); font-size: 12px; padding: 0 6px; white-space: nowrap; }
+[hidden] { display: none !important; }

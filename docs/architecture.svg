@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="460" viewBox="0 0 760 460" role="img" aria-label="Kite 시스템 구성도"><style>
+text{font-family:-apple-system,"Segoe UI","Apple SD Gothic Neo","Malgun Gothic",sans-serif;font-size:11px;fill:#1c2230}
+.d-title{font-size:12px;font-weight:650;fill:#5d6576}.d-head{font-size:12.5px;font-weight:650}.d-dim{fill:#5d6576}
+.d-label{fill:#8a92a3;font-size:10px}.d-mono{font-family:ui-monospace,"SF Mono",Consolas,monospace;font-weight:600;fill:#6d4aff}
+.d-app{fill:#efebff;stroke:#c4b6ff}.d-box{fill:#fff;stroke:#c9ced8}.d-stack{opacity:.6}.d-pill{fill:#e9ecf1}
+.d-ext{fill:#fff;stroke:#6d4aff;stroke-dasharray:4 3}.d-os{fill:#f0f2f5;stroke:#dde1e8}.d-line{stroke:#8a92a3;stroke-width:1.3}
+.d-dash{stroke-dasharray:4 3}.d-headfill{fill:#8a92a3}</style><rect width="760" height="460" fill="#f6f7f9"/>
+  <defs><marker id="d-head" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="d-headfill"/></marker></defs>
+
+  <rect class="d-app" x="176" y="16" width="568" height="330" rx="14"/>
+  <text class="d-title" x="192" y="40">Kite 앱 · Tauri v2 (프로세스 하나, 창 하나)</text>
+
+  <rect class="d-box" x="190" y="56" width="210" height="276" rx="10"/>
+  <text class="d-head" x="202" y="76">Rust 코어</text>
+  <rect class="d-pill" x="200" y="86" width="190" height="22" rx="6"/><text class="d-mono" x="210" y="101">browser.rs</text><text class="d-dim" x="380" y="101" text-anchor="end">탭 상태·웹뷰 배치</text>
+  <rect class="d-pill" x="200" y="116" width="190" height="22" rx="6"/><text class="d-mono" x="210" y="131">keymap.rs</text><text class="d-dim" x="380" y="131" text-anchor="end">단축키 표</text>
+  <rect class="d-pill" x="200" y="146" width="190" height="22" rx="6"/><text class="d-mono" x="210" y="161">palette.rs</text><text class="d-dim" x="380" y="161" text-anchor="end">검색·한영 보정</text>
+  <rect class="d-pill" x="200" y="176" width="190" height="22" rx="6"/><text class="d-mono" x="210" y="191">automation.rs</text><text class="d-dim" x="380" y="191" text-anchor="end">탭에서 JS 실행</text>
+  <rect class="d-pill" x="200" y="206" width="190" height="22" rx="6"/><text class="d-mono" x="210" y="221">mcp.rs</text><text class="d-dim" x="380" y="221" text-anchor="end">MCP 서버·도구</text>
+  <rect class="d-pill" x="200" y="236" width="190" height="22" rx="6"/><text class="d-mono" x="210" y="251">pages.rs</text><text class="d-dim" x="380" y="251" text-anchor="end">내부 페이지 명령</text>
+  <rect class="d-pill" x="200" y="266" width="190" height="22" rx="6"/><text class="d-mono" x="210" y="281">store.rs</text><text class="d-dim" x="380" y="281" text-anchor="end">SQLite 저장소</text>
+  <rect class="d-pill" x="200" y="296" width="190" height="22" rx="6"/><text class="d-mono" x="210" y="311">platform.rs</text><text class="d-dim" x="380" y="311" text-anchor="end">스크린샷·OS 차이</text>
+
+  <text class="d-head" x="530" y="76">웹뷰 (OS 웹 엔진)</text>
+  <rect class="d-box" x="530" y="86" width="190" height="40" rx="8"/><text class="d-mono" x="542" y="104">ui</text><text class="d-dim" x="542" y="120">탭줄 · 툴바 · 북마크 바</text>
+  <rect class="d-box" x="530" y="136" width="190" height="40" rx="8"/><text class="d-mono" x="542" y="154">palette</text><text class="d-dim" x="542" y="170">스포트라이트 오버레이</text>
+  <rect class="d-box d-stack" x="536" y="192" width="190" height="56" rx="8"/>
+  <rect class="d-box" x="530" y="186" width="190" height="56" rx="8"/><text class="d-mono" x="542" y="204">tab-N</text><text class="d-dim" x="542" y="220">웹 페이지 + content.js</text>
+  <rect class="d-box" x="530" y="256" width="190" height="60" rx="8"/><text class="d-mono" x="542" y="274">kite://</text><text class="d-dim" x="542" y="290">새 탭 · 설정 · 북마크</text>
+
+  <line class="d-line" x1="400" y1="106" x2="530" y2="106" marker-end="url(#d-head)" marker-start="url(#d-head)"/><text class="d-label" x="465" y="101" text-anchor="middle">invoke · 이벤트</text>
+  <line class="d-line" x1="400" y1="156" x2="530" y2="156" marker-end="url(#d-head)" marker-start="url(#d-head)"/><text class="d-label" x="465" y="151" text-anchor="middle">invoke · 이벤트</text>
+  <line class="d-line" x1="400" y1="204" x2="530" y2="204" marker-end="url(#d-head)"/><text class="d-label" x="465" y="199" text-anchor="middle">JS 실행</text>
+  <line class="d-line" x1="530" y1="230" x2="400" y2="230" marker-end="url(#d-head)"/><text class="d-label" x="465" y="225" text-anchor="middle">content_event</text>
+  <line class="d-line" x1="400" y1="286" x2="530" y2="286" marker-end="url(#d-head)" marker-start="url(#d-head)"/><text class="d-label" x="465" y="281" text-anchor="middle">invoke (로컬만)</text>
+
+  <rect class="d-ext" x="16" y="186" width="140" height="58" rx="10"/>
+  <text class="d-head" x="86" y="210" text-anchor="middle">AI 에이전트</text>
+  <text class="d-dim" x="86" y="228" text-anchor="middle">Claude Code 등</text>
+  <line class="d-line" x1="156" y1="217" x2="200" y2="217" marker-end="url(#d-head)"/>
+  <text class="d-label" x="86" y="262" text-anchor="middle">HTTP · 127.0.0.1</text>
+  <text class="d-label" x="86" y="276" text-anchor="middle">Bearer 토큰</text>
+
+  <rect class="d-os" x="16" y="364" width="728" height="84" rx="12"/>
+  <text class="d-title" x="30" y="438">운영체제 (macOS · Windows)</text>
+  <rect class="d-box" x="30" y="378" width="140" height="38" rx="8"/>
+  <text class="d-dim" x="100" y="401" text-anchor="middle">외부 앱 · f5-epi: 등</text>
+  <rect class="d-box" x="190" y="378" width="210" height="38" rx="8"/>
+  <text class="d-dim" x="295" y="401" text-anchor="middle">kite.db (SQLite) · mcp-token</text>
+  <rect class="d-box" x="530" y="378" width="190" height="38" rx="8"/>
+  <text class="d-dim" x="625" y="401" text-anchor="middle">WKWebView · WebView2</text>
+
+  <line class="d-line" x1="295" y1="332" x2="295" y2="378" marker-end="url(#d-head)"/>
+  <text class="d-label" x="301" y="356">읽기·쓰기</text>
+  <path class="d-line" d="M190 320 H100 V378" fill="none" marker-end="url(#d-head)"/>
+  <text class="d-label" x="106" y="356">확인 후 열기</text>
+  <line class="d-line d-dash" x1="625" y1="332" x2="625" y2="378"/>
+  <text class="d-label" x="631" y="356">렌더링</text>
+</svg>

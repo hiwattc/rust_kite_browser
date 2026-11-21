@@ -1,0 +1,86 @@
+/* Kite's own pages in tabs (settings, bookmarks): scrollable documents. */
+html, body { height: auto; min-height: 100%; }
+body { overflow: auto; user-select: text; -webkit-user-select: text; background: var(--bg-toolbar); }
+.page { display: grid; grid-template-columns: 220px minmax(0, 1fr); max-width: 1080px; margin: 0 auto; min-height: 100vh; }
+.side { position: sticky; top: 0; align-self: start; padding: 28px 12px; display: flex; flex-direction: column; gap: 2px; }
+.side h1 { font-size: 20px; font-weight: 700; margin: 0 10px 18px; display: flex; align-items: center; gap: 8px; }
+.side h1 .icon { width: 20px; height: 20px; color: var(--accent); }
+.nav { display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 12px; border-radius: 17px; color: var(--text-dim); text-decoration: none; font-size: 13px; cursor: default; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nav:hover { background: var(--bg-hover); color: var(--text); }
+.nav.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.nav .icon { width: 15px; height: 15px; flex: none; }
+.nav .count { margin-left: auto; font-size: 11px; color: var(--text-faint); }
+main { padding: 28px 28px 80px; min-width: 0; }
+.card { background: var(--bg-panel); border: 1px solid var(--border); border-radius: 12px; margin-bottom: 22px; overflow: hidden; }
+.card > h2 { font-size: 14px; font-weight: 650; margin: 0; padding: 16px 20px 6px; }
+.card > p.desc { margin: 0; padding: 0 20px 10px; color: var(--text-faint); font-size: 12px; }
+.row { display: flex; align-items: center; gap: 16px; min-height: 56px; padding: 10px 20px; border-top: 1px solid var(--border); }
+.row:first-of-type { border-top: 0; }
+.row .label { flex: 1; min-width: 0; }
+.row .label b { display: block; font-weight: 500; font-size: 13px; }
+.row .label small { display: block; color: var(--text-faint); font-size: 12px; margin-top: 2px; word-break: break-all; }
+select, input[type="text"], input[type="url"], input[type="number"], input[type="search"] {
+  height: 32px; padding: 0 10px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--bg-input-focus); font-size: 13px; outline: none; min-width: 0;
+}
+select:focus, input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.btn { height: 32px; padding: 0 14px; border-radius: 16px; border: 1px solid var(--border-strong); background: var(--bg-panel); font-size: 12.5px; font-weight: 500; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
+.btn:hover { background: var(--bg-hover); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn.primary:hover { filter: brightness(1.08); }
+.btn.danger { color: #d03b3b; }
+.btn .icon { width: 14px; height: 14px; }
+.switch { position: relative; width: 38px; height: 22px; flex: none; }
+.switch input { opacity: 0; width: 0; height: 0; position: absolute; }
+.switch span { position: absolute; inset: 0; border-radius: 11px; background: var(--border-strong); transition: background .15s; }
+.switch span::after { content: ""; position: absolute; left: 3px; top: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform .15s; box-shadow: 0 1px 2px rgba(0,0,0,.3); }
+.switch input:checked + span { background: var(--accent); }
+.switch input:checked + span::after { transform: translateX(16px); }
+code, .mono { font-family: var(--mono); font-size: 12px; }
+.codebox { display: flex; align-items: center; gap: 8px; margin: 0 20px 14px; padding: 10px 12px; background: var(--bg-input); border-radius: 8px; }
+.codebox code { flex: 1; min-width: 0; overflow-x: auto; white-space: nowrap; }
+.status { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-faint); }
+.status::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--text-faint); }
+.status.on { color: var(--ok); }
+.status.on::before { background: var(--ok); }
+kbd { font-family: var(--font); font-size: 11px; color: var(--text-dim); background: var(--bg-hover); border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 4px; padding: 0 6px; line-height: 18px; margin-left: 4px; }
+.flash { position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%); background: var(--text); color: var(--bg-toolbar); padding: 9px 16px; border-radius: 18px; font-size: 12.5px; box-shadow: var(--shadow); z-index: 10; max-width: 80vw; }
+.empty { padding: 40px 20px; text-align: center; color: var(--text-faint); }
+dialog { border: 1px solid var(--border-strong); border-radius: 14px; padding: 0; background: var(--bg-panel); color: var(--text); box-shadow: var(--shadow); width: min(460px, 90vw); }
+dialog::backdrop { background: rgba(0, 0, 0, .35); }
+dialog form { display: flex; flex-direction: column; gap: 12px; padding: 20px; }
+dialog h3 { margin: 0 0 4px; font-size: 15px; }
+dialog label { display: flex; flex-direction: column; gap: 5px; font-size: 12px; color: var(--text-dim); }
+dialog .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }
+/* Settings → 시스템 구성도 / 구현 아키텍처 / 오픈소스 */
+.diagram-wrap { padding: 4px 20px 18px; }
+.diagram { display: block; width: 100%; height: auto; font-family: var(--font); }
+.diagram text { fill: var(--text); font-size: 11px; }
+.diagram .d-title { font-size: 12px; font-weight: 650; fill: var(--text-dim); }
+.diagram .d-head { font-size: 12.5px; font-weight: 650; }
+.diagram .d-dim { fill: var(--text-dim); }
+.diagram .d-label { fill: var(--text-faint); font-size: 10px; }
+.diagram .d-mono { font-family: var(--mono); font-size: 11px; font-weight: 600; fill: var(--accent); }
+.diagram .d-app { fill: var(--accent-soft); stroke: var(--accent); stroke-opacity: .35; }
+.diagram .d-box { fill: var(--bg-panel); stroke: var(--border-strong); }
+.diagram .d-stack { opacity: .6; }
+.diagram .d-pill { fill: var(--bg-input); stroke: none; }
+.diagram .d-ext { fill: var(--bg-panel); stroke: var(--accent); stroke-dasharray: 4 3; }
+.diagram .d-os { fill: var(--bg-hover); stroke: var(--border); }
+.diagram .d-line { stroke: var(--text-faint); stroke-width: 1.3; }
+.diagram .d-dash { stroke-dasharray: 4 3; }
+.diagram .d-headfill { fill: var(--text-faint); }
+.arch { padding: 12px 20px; border-top: 1px solid var(--border); }
+.arch b { display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+.arch p { margin: 0; font-size: 12.5px; line-height: 1.65; color: var(--text-dim); }
+.arch code, .oss .ver { background: var(--bg-input); border-radius: 4px; padding: 0 4px; font-size: 11.5px; }
+.oss-group { margin: 0; padding: 14px 20px 6px; font-size: 12px; font-weight: 650; color: var(--text-dim); border-top: 1px solid var(--border); }
+.oss { width: calc(100% - 40px); margin: 0 20px 10px; border-collapse: collapse; font-size: 12.5px; }
+.oss td { padding: 6px 0; border-top: 1px solid var(--border); vertical-align: top; }
+.oss tr:first-child td { border-top: 0; }
+.oss td:first-child { width: 42%; padding-right: 12px; }
+.oss td.lic { width: 26%; text-align: right; color: var(--text-faint); font-size: 12px; }
+.oss a { color: var(--accent); text-decoration: none; font-weight: 500; }
+.oss a:hover { text-decoration: underline; }
+.oss .ver { color: var(--text-faint); font-family: var(--mono); font-size: 11px; }
+[hidden] { display: none !important; }
+@media (max-width: 720px) { .page { grid-template-columns: 1fr; } .side { position: static; flex-direction: row; flex-wrap: wrap; padding-bottom: 0; } .side h1 { width: 100%; } }

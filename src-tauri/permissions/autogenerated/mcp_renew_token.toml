@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-mcp-renew-token"
+description = "Enables the mcp_renew_token command without any pre-configured scope."
+commands.allow = ["mcp_renew_token"]
+
+[[permission]]
+identifier = "deny-mcp-renew-token"
+description = "Denies the mcp_renew_token command without any pre-configured scope."
+commands.deny = ["mcp_renew_token"]

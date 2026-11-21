@@ -1,0 +1,60 @@
+[package]
+name = "kite"
+version = "0.1.0"
+description = "Kite: a small Rust browser with a spotlight palette and an MCP automation server"
+edition = "2024"
+
+[lib]
+name = "kite_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.7", features = [] }
+
+[dependencies]
+# `unstable`: several webviews in one window (chrome UI, palette overlay, one per tab).
+tauri = { version = "2.12", features = ["unstable", "devtools"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1.54", features = ["rt-multi-thread", "macros", "sync", "time", "net", "io-util"] }
+thiserror = "2"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+rusqlite = { version = "0.42.0", features = ["bundled"] }
+url = "2"
+percent-encoding = "2"
+ring = "0.17"
+base64 = "0.22"
+arboard = { version = "3", default-features = false }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
+dirs = "6"
+# MCP server (same stack as termtree): Streamable HTTP on 127.0.0.1 with a bearer token.
+rmcp = { version = "3.10.0", features = ["server", "macros", "transport-streamable-http-server"] }
+hyper = { version = "1", features = ["server", "http1"] }
+hyper-util = { version = "0.1.21", features = ["tokio", "service"] }
+http-body-util = "0.1"
+bytes = "1"
+http = "1"
+tokio-util = "0.7"
+tower-service = "0.3"
+tauri-plugin-dialog = "2.8.4"
+tauri-plugin-opener = "2.7.3"
+
+# Native screenshots of a tab (WKWebView takeSnapshot / WebView2 CapturePreview).
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+block2 = "0.6"
+objc2-foundation = { version = "0.3", features = ["NSData", "NSError", "NSString", "NSValue", "NSGeometry", "NSDictionary"] }
+objc2-app-kit = { version = "0.3", features = ["NSImage", "NSImageRep", "NSBitmapImageRep", "NSGraphics", "NSView"] }
+objc2-web-kit = { version = "0.3", features = ["WKWebView", "WKSnapshotConfiguration", "block2", "objc2-app-kit"] }
+
+[target.'cfg(windows)'.dependencies]
+webview2-com = "0.39"
+windows = { version = "0.62", features = ["Win32_Foundation", "Win32_System_Com", "Win32_System_Com_StructuredStorage", "Win32_UI_WindowsAndMessaging", "Win32_System_Memory"] }
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = 3
+panic = "abort"
+strip = true

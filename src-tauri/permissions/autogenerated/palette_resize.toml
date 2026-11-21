@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-palette-resize"
+description = "Enables the palette_resize command without any pre-configured scope."
+commands.allow = ["palette_resize"]
+
+[[permission]]
+identifier = "deny-palette-resize"
+description = "Denies the palette_resize command without any pre-configured scope."
+commands.deny = ["palette_resize"]
