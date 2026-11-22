@@ -29,6 +29,11 @@ jobs:
       - name: Build (release, no installer)
         working-directory: src-tauri
         run: cargo build --release --features tauri/custom-protocol
+      # A portable kite.exe with the diagnostics (log + watchdog), to run on a PC that hangs.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kite-windows-exe
+          path: src-tauri/target/release/kite.exe
       - name: Start Kite and watch it
         shell: pwsh
         run: |
@@ -73,6 +78,47 @@ jobs:
             }
             foreach ($i in 1..10) { Start-Sleep -Seconds 1; $p.Refresh(); if (-not $p.HasExited -and -not $p.Responding) { $hung++; Write-Host "t+$i s: NOT RESPONDING" } }
           }
+          # Real mouse clicks and typing on the window (what a person does), then a screenshot.
+          if (-not $p.HasExited) {
+            Add-Type -AssemblyName System.Drawing, System.Windows.Forms
+            Add-Type @"
+          using System; using System.Runtime.InteropServices;
+          public static class U {
+            [StructLayout(LayoutKind.Sequential)] public struct R { public int L, T, Rt, B; }
+            [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out R r);
+            [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
+            [DllImport("user32.dll")] public static extern bool SetCursorPos(int x, int y);
+            [DllImport("user32.dll")] public static extern void mouse_event(uint f, uint x, uint y, uint d, IntPtr e);
+            [DllImport("user32.dll")] public static extern uint GetDpiForWindow(IntPtr h);
+            public static void Click(int x, int y) { SetCursorPos(x, y); mouse_event(2, 0, 0, 0, IntPtr.Zero); mouse_event(4, 0, 0, 0, IntPtr.Zero); }
+          }
+          "@
+            $p.Refresh(); $hw = $p.MainWindowHandle
+            [U]::SetForegroundWindow($hw) | Out-Null
+            $r = New-Object U+R; [U]::GetWindowRect($hw, [ref]$r) | Out-Null
+            $s = [U]::GetDpiForWindow($hw) / 96.0
+            Write-Host "window rect $($r.L),$($r.T)-$($r.Rt),$($r.B) scale $s"
+            function At($x, $y) { [int]($r.L + $x * $s), [int]($r.T + $y * $s) }
+            $steps = @(
+              @("address bar", 400, 60), @("type", 0, 0), @("tab strip", 160, 22), @("page", 600, 400),
+              @("address bar again", 500, 60), @("settings button", 1222, 60), @("page again", 640, 500), @("new tab +", 0, 0)
+            )
+            foreach ($st in $steps) {
+              $name = $st[0]
+              if ($name -eq "type") { [System.Windows.Forms.SendKeys]::SendWait("example.org"); Start-Sleep -Milliseconds 400; [System.Windows.Forms.SendKeys]::SendWait("{ENTER}") }
+              elseif ($name -eq "new tab +") { [System.Windows.Forms.SendKeys]::SendWait("^t"); Start-Sleep -Milliseconds 400; [System.Windows.Forms.SendKeys]::SendWait("{ESC}") }
+              else { $xy = At $st[1] $st[2]; [U]::Click($xy[0], $xy[1]) }
+              Start-Sleep -Seconds 2; $p.Refresh()
+              if ($p.HasExited) { Write-Host "Kite exited during '$name'"; break }
+              Write-Host "after '$name': responding=$($p.Responding)"
+              if (-not $p.Responding) { $hung++ }
+            }
+            foreach ($i in 1..8) { Start-Sleep -Seconds 1; $p.Refresh(); if (-not $p.HasExited -and -not $p.Responding) { $hung++; Write-Host "after clicks t+$i s: NOT RESPONDING" } }
+            $b = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+            $bmp = New-Object System.Drawing.Bitmap $b.Width, $b.Height
+            $g = [System.Drawing.Graphics]::FromImage($bmp); $g.CopyFromScreen($b.Location, [System.Drawing.Point]::Empty, $b.Size)
+            $bmp.Save("$env:RUNNER_TEMP\screen.png"); Write-Host "screenshot saved"
+          }
           if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force }
           Write-Host "not-responding samples: $hung"
           "HUNG=$hung" | Out-File -Append $env:GITHUB_ENV
@@ -87,6 +133,11 @@ jobs:
         with:
           name: kite-windows-log
           path: ${{ env.APPDATA }}\com.kite.browser\kite*.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: kite-windows-screen
+          path: ${{ runner.temp }}/screen.png
       - name: Fail when the UI hung
         if: env.HUNG != '0'
         run: exit 1
