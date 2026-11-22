@@ -148,6 +148,9 @@ jobs:
             $q = Rect; [U]::Drag($q.Rt - 2, [int](($q.T + $q.B) / 2), 40, 0); Start-Sleep -Milliseconds 700; Show "after right-edge drag +40 just inside"
             $q = Rect; [U]::Drag([int](($q.L + $q.Rt) / 2), $q.B + 3, 0, 50); Start-Sleep -Milliseconds 700; Show "after bottom-edge drag +50 just outside (expect taller)"
             $q = Rect; [U]::Drag($q.L - 3, [int](($q.T + $q.B) / 2), -40, 0); Start-Sleep -Milliseconds 700; Show "after left-edge drag -40 just outside (expect wider)"
+            $q = Rect; [U]::Drag([int](($q.L + $q.Rt) / 2), $q.B - 2, 0, 40); Start-Sleep -Milliseconds 700; Show "after bottom-edge drag +40 just inside (expect taller)"
+            $q = Rect; [U]::Drag($q.L + 2, [int](($q.T + $q.B) / 2), -40, 0); Start-Sleep -Milliseconds 700; Show "after left-edge drag -40 just inside (expect wider)"
+            $q = Rect; [U]::Drag($q.Rt - 2, $q.B - 2, 30, 30); Start-Sleep -Milliseconds 700; Show "after bottom-right corner drag +30,+30"
             Shot "frame-resized"
             # minimize, then bring back
             $q = Rect; [U]::Click($q.Rt - 115, $q.T + 18); Start-Sleep -Seconds 1; Show "after min click"

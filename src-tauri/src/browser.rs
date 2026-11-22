@@ -249,6 +249,10 @@ pub fn toast(app: &AppHandle, msg: impl Into<String>) {
 }
 
 /// Kite's own pages shown in tabs: `kite://<name>` ↔ `<name>.html` of the app.
+/// Bare margin along a Windows window's edges for resizing (see `Browser::frame`).
+#[cfg(windows)]
+const WIN_RESIZE_FRAME: f64 = 4.0;
+
 pub const INTERNAL: [&str; 7] = ["newtab", "settings", "bookmarks", "meet", "neterror", "home", "downloads"];
 
 /// Which internal page an app URL is (dev server or bundled assets).
@@ -449,11 +453,35 @@ impl Browser {
     // ---------- layout ----------
 
     /// Window content size in logical pixels.
+    /// Room the webviews leave free along the window's edges (logical px). Windows: the window
+    /// has no frame and its webviews would cover the whole client area, so nothing could be
+    /// grabbed to resize it; a thin margin stays bare there and Windows treats it as the resize
+    /// border (tao's hit testing for undecorated windows). None when maximized.
+    fn frame(&self, n: u32) -> f64 {
+        #[cfg(windows)]
+        if let Some(w) = self.window(n)
+            && !w.is_maximized().unwrap_or(false)
+            && !w.is_fullscreen().unwrap_or(false)
+        {
+            return WIN_RESIZE_FRAME;
+        }
+        let _ = n;
+        0.0
+    }
+
+    /// The area the webviews share (inside `frame`), logical px.
     fn content_size(&self, n: u32) -> Option<(f64, f64)> {
         let w = self.window(n)?;
         let scale = w.scale_factor().ok()?;
         let size = w.inner_size().ok()?.to_logical::<f64>(scale);
-        Some((size.width, size.height))
+        let f = self.frame(n);
+        Some(((size.width - 2.0 * f).max(1.0), (size.height - 2.0 * f).max(1.0)))
+    }
+
+    /// A webview rectangle in window `n`, `x`/`y` relative to the content area (inside `frame`).
+    fn place(&self, n: u32, x: f64, y: f64, w: f64, h: f64) -> Rect {
+        let f = self.frame(n);
+        Self::rect(x + f, y + f, w, h)
     }
 
     fn rect(x: f64, y: f64, w: f64, h: f64) -> Rect {
@@ -476,13 +504,13 @@ impl Browser {
             (win.chrome_height, win.active, live, s.palette_win == Some(n), s.palette_height)
         };
         if let Some(ui) = self.0.app.get_webview(&ui_label(n)) {
-            let _ = ui.set_bounds(Self::rect(0.0, 0.0, w, chrome));
+            let _ = ui.set_bounds(self.place(n, 0.0, 0.0, w, chrome));
         }
         // The vertical tab list takes the left of the page area.
         let sx = self.side_x(w);
         if let Some(side) = self.0.app.get_webview(&side_label(n)) {
             if sx > 0.0 {
-                let _ = side.set_bounds(Self::rect(0.0, chrome, sx, h - chrome));
+                let _ = side.set_bounds(self.place(n, 0.0, chrome, sx, h - chrome));
                 let _ = side.show();
             } else {
                 let _ = side.hide();
@@ -491,7 +519,7 @@ impl Browser {
         for id in live {
             if let Some(wv) = self.webview(id) {
                 if Some(id) == active {
-                    let _ = wv.set_bounds(Self::rect(sx, chrome, w - sx, h - chrome));
+                    let _ = wv.set_bounds(self.place(n, sx, chrome, w - sx, h - chrome));
                     let _ = wv.show();
                 } else {
                     let _ = wv.hide();
@@ -501,7 +529,7 @@ impl Browser {
         if palette_open && let Some(p) = self.0.app.get_webview(&palette_label(n)) {
             let pw = PALETTE_WIDTH.min(w - 24.0);
             let ph = palette_h.min(h - PALETTE_TOP - 16.0);
-            let _ = p.set_bounds(Self::rect(((w - pw) / 2.0).round(), PALETTE_TOP, pw, ph));
+            let _ = p.set_bounds(self.place(n, ((w - pw) / 2.0).round(), PALETTE_TOP, pw, ph));
         }
     }
 
@@ -1420,7 +1448,7 @@ impl Browser {
         let chrome = self.0.state.lock().unwrap().wins.get(&win).map(|w| w.chrome_height).unwrap_or(DEFAULT_CHROME_HEIGHT);
         let _ = c.emit_to(cover_label(win), "cover", image);
         let sx = self.side_x(cw);
-        let _ = c.set_bounds(Self::rect(sx, chrome, cw - sx, h - chrome));
+        let _ = c.set_bounds(self.place(win, sx, chrome, cw - sx, h - chrome));
         let _ = c.reparent(&w);
         #[cfg(windows)]
         crate::platform::bring_to_front(&c);
@@ -1882,7 +1910,7 @@ impl Browser {
         }
         let height = count as f64 * ROW + 12.0;
         let _ = o.emit_to(omni_label(n), "omni-items", serde_json::json!({ "items": items, "selected": selected }));
-        let _ = o.set_bounds(Self::rect(x.max(0.0), y, width.max(200.0), height));
+        let _ = o.set_bounds(self.place(n, x.max(0.0), y, width.max(200.0), height));
         if OMNI_SHOWN.lock().unwrap().insert(n) {
             // Above the page (macOS: re-adding the view puts it on top).
             let _ = o.reparent(&w);

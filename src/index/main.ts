@@ -358,6 +358,15 @@ function setupWindowControls() {
   });
   win.onResized(() => sync());
   sync();
+  // The bare resize margin around the webviews shows the window's own background: the strip's
+  // color, following the theme.
+  const tint = () => {
+    const c = getComputedStyle(document.documentElement).getPropertyValue("--bg-strip").trim();
+    if (c) win.setBackgroundColor(c).catch(() => {});
+  };
+  new MutationObserver(tint).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme", "class"] });
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", tint);
+  tint();
 }
 
 $("#dl").onclick = () => invoke("downloads_page").catch((err) => toast(String(err)));
