@@ -80,6 +80,7 @@ pub fn bindings() -> Vec<Binding> {
             ("Meta+Alt+KeyB".into(), "open_bookmarks"),
             ("Meta+Shift+KeyB".into(), "toggle_bookmark_bar"),
             ("Meta+Comma".into(), "open_settings"),
+            ("Meta+Alt+KeyL".into(), "open_downloads"),
         ]);
     } else {
         v.extend([
@@ -97,6 +98,7 @@ pub fn bindings() -> Vec<Binding> {
             ("Ctrl+Shift+KeyO".into(), "open_bookmarks"),
             ("Ctrl+Shift+KeyB".into(), "toggle_bookmark_bar"),
             ("Ctrl+Comma".into(), "open_settings"),
+            ("Ctrl+KeyJ".into(), "open_downloads"),
         ]);
     }
     for (i, a) in ["tab_1", "tab_2", "tab_3", "tab_4", "tab_5", "tab_6", "tab_7", "tab_8", "tab_last"].iter().enumerate() {

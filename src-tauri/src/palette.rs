@@ -49,6 +49,7 @@ pub struct Command {
 
 pub const COMMANDS: &[Command] = &[
     Command { id: "open_settings", title: "설정", keywords: "settings preferences 환경설정 옵션 kite://settings" },
+    Command { id: "open_downloads", title: "다운로드", keywords: "downloads download history files 다운로드 내려받기 파일 기록 kite://downloads" },
     Command { id: "open_home", title: "홈 (개인 포털)", keywords: "home portal start igoogle workspace 홈 포털 시작 워크스페이스 할 일 todo kite://home" },
     Command { id: "open_meet", title: "영상회의 (1:1, 화면 공유)", keywords: "meet video call conference webrtc p2p 화상 회의 통화 화면 공유 kite://meet" },
     Command { id: "open_bookmarks", title: "북마크 관리자", keywords: "bookmarks manager 즐겨찾기 편집 kite://bookmarks" },
@@ -231,6 +232,7 @@ fn search_one(query: &str, tabs: &[TabRef], store: &Store, engine: &str, typed: 
                 "bookmarks" => "북마크 관리자",
                 "meet" => "영상회의",
                 "home" => "홈 (개인 포털)",
+                "downloads" => "다운로드",
                 _ => "새 탭",
             };
             items.push(Item { kind: "url".into(), id: format!("kite://{p}"), title: name.into(), subtitle: format!("kite://{p}"), icon: None, hint: None });

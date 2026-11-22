@@ -2,7 +2,7 @@
 // this with `node scripts/diagram.mjs`, so the README and the app show the same picture.
 
 const W = 900;
-const H = 700;
+const H = 728;
 
 /** Rust modules, top to bottom (name, what it does). */
 const CORE: [string, string][] = [
@@ -21,6 +21,7 @@ const CORE: [string, string][] = [
   ["passwords.rs", "비밀번호 (키체인)"],
   ["meet.rs", "영상회의 서버·중계"],
   ["session_cookies.rs", "로그인 유지"],
+  ["downloads.rs", "다운로드 진행률·기록"],
   ["store.rs", "SQLite 저장소"],
   ["platform.rs", "스크린샷·확장 엔진·OS 차이"],
 ];
@@ -46,7 +47,7 @@ const VIEWS: [string, string, number][] = [
   ["cover", "되살리는 탭의 마지막 화면", 38],
   ["tab-N", "웹 페이지 + content.js", 50],
   ["popup-N", "로그인·결제 팝업 창", 38],
-  ["kite://", "home · settings · bookmarks · meet · neterror", 50],
+  ["kite://", "home · settings · bookmarks · downloads · meet …", 50],
 ];
 const viewTop: number[] = [];
 {

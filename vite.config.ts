@@ -7,7 +7,7 @@ export default defineConfig(() => ({
   build: {
     chunkSizeWarningLimit: 1500,
     rollupOptions: {
-      input: { index: "index.html", palette: "palette.html", newtab: "newtab.html", settings: "settings.html", bookmarks: "bookmarks.html", omni: "omni.html", meet: "meet.html", cover: "cover.html", side: "side.html", siteinfo: "siteinfo.html", neterror: "neterror.html", home: "home.html" },
+      input: { index: "index.html", palette: "palette.html", newtab: "newtab.html", settings: "settings.html", bookmarks: "bookmarks.html", omni: "omni.html", meet: "meet.html", cover: "cover.html", side: "side.html", siteinfo: "siteinfo.html", neterror: "neterror.html", home: "home.html", downloads: "downloads.html" },
     },
   },
   server: {

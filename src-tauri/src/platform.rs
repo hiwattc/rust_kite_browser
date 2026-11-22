@@ -597,32 +597,6 @@ mod ext_win {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn png(w: u32, h: u32) -> Vec<u8> {
-        let img = image::RgbaImage::from_pixel(w, h, image::Rgba([10, 20, 30, 255]));
-        let mut out = std::io::Cursor::new(Vec::new());
-        image::DynamicImage::ImageRgba8(img).write_to(&mut out, image::ImageFormat::Png).unwrap();
-        out.into_inner()
-    }
-
-    #[test]
-    fn encode_scales_crops_and_converts() {
-        let src = png(2000, 1000);
-        let (b, w, h) = encode(&src, None, 1000, true).unwrap();
-        assert_eq!((w, h), (1000, 500));
-        assert_eq!(&b[..2], &[0xFF, 0xD8]); // JPEG
-        let (b, w, h) = encode(&src, Some((10.0, 10.0, 100.0, 50.0, 1000.0)), 0, false).unwrap();
-        assert_eq!((w, h), (200, 100));
-        assert_eq!(&b[1..4], b"PNG");
-        // crop beyond the edge is clamped
-        let (_, w, h) = encode(&src, Some((990.0, 490.0, 100.0, 100.0, 1000.0)), 0, false).unwrap();
-        assert_eq!((w, h), (20, 20));
-    }
-}
-
 // ---------------------------------------------------------------- certificate exceptions
 
 /// Hosts whose certificate the user chose to accept anyway ("계속 진행", like Chrome's
@@ -652,6 +626,8 @@ pub fn install_cert_exceptions(wv: &Webview) {
     let _ = wv.with_webview(|pw| {
         // Safety: the live WKWebView on the main thread; wry keeps its delegate alive.
         unsafe { mac_cert::hook(pw.inner() as *mut objc2::runtime::AnyObject) };
+        // The download delegate class exists once a webview with a download handler does.
+        mac_download::install();
     });
     #[cfg(not(target_os = "macos"))]
     let _ = wv;
@@ -707,5 +683,169 @@ mod mac_cert {
             let _: () = msg_send![view, setNavigationDelegate: std::ptr::null_mut::<AnyObject>()];
             let _: () = msg_send![view, setNavigationDelegate: d];
         }
+    }
+}
+
+// ---------------------------------------------------------------- download progress
+
+/// The engine's own download object (macOS `WKDownload`, retained) and the size the server
+/// announced (`-1` unknown). Only touched on the main thread; released when dropped.
+pub struct DownloadHandle {
+    #[cfg(target_os = "macos")]
+    ptr: usize,
+    pub expected: i64,
+}
+
+#[cfg(target_os = "macos")]
+impl Drop for DownloadHandle {
+    fn drop(&mut self) {
+        // Safety: we hold one retain on this object (taken in `mac_download::decide`).
+        unsafe { objc2::ffi::objc_release(self.ptr as *mut _) };
+    }
+}
+
+/// The download whose destination Tauri is being asked for right now (set just before, on the
+/// same main-thread call), if the engine exposes one.
+pub fn take_download_handle() -> Option<DownloadHandle> {
+    #[cfg(target_os = "macos")]
+    return mac_download::CURRENT.with(|c| c.take()).map(|(ptr, expected)| DownloadHandle { ptr, expected });
+    #[cfg(not(target_os = "macos"))]
+    None
+}
+
+/// Bytes received and expected (`-1` unknown). Main thread.
+pub fn download_progress(h: &DownloadHandle) -> (i64, i64) {
+    #[cfg(target_os = "macos")]
+    {
+        use objc2::msg_send;
+        use objc2::runtime::AnyObject;
+        // Safety: a live, retained WKDownload; NSProgress counts are plain getters.
+        unsafe {
+            let dl = h.ptr as *mut AnyObject;
+            let p: *mut AnyObject = msg_send![dl, progress];
+            if p.is_null() {
+                return (0, h.expected);
+            }
+            let got: i64 = msg_send![p, completedUnitCount];
+            let total: i64 = msg_send![p, totalUnitCount];
+            (got, if total > 0 { total } else { h.expected })
+        }
+    }
+    #[cfg(not(target_os = "macos"))]
+    (0, h.expected)
+}
+
+/// Stops a download (WebKit then reports nothing: the caller ends it). Main thread.
+pub fn download_cancel(h: &DownloadHandle) {
+    #[cfg(target_os = "macos")]
+    {
+        use objc2::msg_send;
+        use objc2::runtime::AnyObject;
+        // Safety: a live WKDownload; the completion handler may be nil.
+        unsafe {
+            let _: () = msg_send![h.ptr as *mut AnyObject, cancel: std::ptr::null_mut::<AnyObject>()];
+        }
+    }
+    #[cfg(not(target_os = "macos"))]
+    let _ = h;
+}
+
+/// wry's download delegate asks Tauri for the destination inside
+/// `download:decideDestinationUsingResponse:suggestedFilename:completionHandler:` but passes
+/// neither the WKDownload nor the response on. Kite wraps that method once: it notes the
+/// download (retained) and the response's expected length, then runs wry's own code, during
+/// which Kite's download handler takes them (`take_download_handle`).
+#[cfg(target_os = "macos")]
+mod mac_download {
+    use std::cell::Cell;
+    use std::sync::OnceLock;
+
+    use objc2::ffi::{class_getInstanceMethod, class_getName, method_setImplementation, objc_copyClassList, objc_retain};
+    use objc2::msg_send;
+    use objc2::runtime::{AnyObject, Imp, Sel};
+
+    thread_local! {
+        pub static CURRENT: Cell<Option<(usize, i64)>> = const { Cell::new(None) };
+    }
+
+    type Decide = unsafe extern "C-unwind" fn(*mut AnyObject, Sel, *mut AnyObject, *mut AnyObject, *mut AnyObject, *mut AnyObject);
+    static ORIGINAL: OnceLock<usize> = OnceLock::new();
+
+    unsafe extern "C-unwind" fn decide(this: *mut AnyObject, cmd: Sel, download: *mut AnyObject, response: *mut AnyObject, name: *mut AnyObject, handler: *mut AnyObject) {
+        // Safety: called by WebKit on the main thread with live objects.
+        unsafe {
+            let expected: i64 = if response.is_null() { -1 } else { msg_send![response, expectedContentLength] };
+            if !download.is_null() {
+                objc_retain(download as *mut _);
+                CURRENT.with(|c| c.set(Some((download as usize, expected))));
+            }
+            if let Some(orig) = ORIGINAL.get() {
+                let f: Decide = std::mem::transmute::<usize, Decide>(*orig);
+                f(this, cmd, download, response, name, handler);
+            }
+            // Not taken (no handler ran): give the retain back.
+            if let Some((p, _)) = CURRENT.with(|c| c.take()) {
+                objc2::ffi::objc_release(p as *mut _);
+            }
+        }
+    }
+
+    /// Wraps the method on wry's download delegate class (found by name), once.
+    pub fn install() {
+        if ORIGINAL.get().is_some() {
+            return;
+        }
+        // Safety: Objective-C runtime calls; `decide` has the selector's signature.
+        unsafe {
+            let mut count: std::ffi::c_uint = 0;
+            let list = objc_copyClassList(&mut count);
+            if list.is_null() {
+                return;
+            }
+            let classes = std::slice::from_raw_parts(list, count as usize);
+            let cls = classes.iter().copied().find(|c| std::ffi::CStr::from_ptr(class_getName(*c)).to_string_lossy().contains("WryDownloadDelegate"));
+            libc_free(list as *mut _);
+            let Some(cls) = cls else { return };
+            let sel = objc2::sel!(download:decideDestinationUsingResponse:suggestedFilename:completionHandler:);
+            let m = class_getInstanceMethod(cls, sel);
+            if m.is_null() {
+                return;
+            }
+            let ours: Imp = std::mem::transmute::<Decide, Imp>(decide);
+            if let Some(old) = method_setImplementation(m as *mut _, ours) {
+                let _ = ORIGINAL.set(old as usize);
+            }
+        }
+    }
+
+    unsafe extern "C" {
+        #[link_name = "free"]
+        fn libc_free(p: *mut std::ffi::c_void);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn png(w: u32, h: u32) -> Vec<u8> {
+        let img = image::RgbaImage::from_pixel(w, h, image::Rgba([10, 20, 30, 255]));
+        let mut out = std::io::Cursor::new(Vec::new());
+        image::DynamicImage::ImageRgba8(img).write_to(&mut out, image::ImageFormat::Png).unwrap();
+        out.into_inner()
+    }
+
+    #[test]
+    fn encode_scales_crops_and_converts() {
+        let src = png(2000, 1000);
+        let (b, w, h) = encode(&src, None, 1000, true).unwrap();
+        assert_eq!((w, h), (1000, 500));
+        assert_eq!(&b[..2], &[0xFF, 0xD8]); // JPEG
+        let (b, w, h) = encode(&src, Some((10.0, 10.0, 100.0, 50.0, 1000.0)), 0, false).unwrap();
+        assert_eq!((w, h), (200, 100));
+        assert_eq!(&b[1..4], b"PNG");
+        // crop beyond the edge is clamped
+        let (_, w, h) = encode(&src, Some((990.0, 490.0, 100.0, 100.0, 1000.0)), 0, false).unwrap();
+        assert_eq!((w, h), (20, 20));
     }
 }

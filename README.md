@@ -28,7 +28,8 @@ OS에 들어 있는 웹 엔진(Windows WebView2, macOS WKWebView)을 그대로 �
 | **AI 자동화 (MCP)** | Claude Code 같은 에이전트가 Playwright처럼 탭을 조작 (스냅샷·클릭·입력·스크린샷 등 23개 도구). 사용자의 로그인 상태 그대로, 보이는 탭에서 |
 | **설정** | `kite://settings` — 검색 엔진, 세션 복원, MCP 서버·토큰, 데이터 삭제, 단축키, 시스템 구성도·아키텍처·오픈소스 |
 | **단축키** | 페이지에 포커스가 있어도, 한글 입력 상태에서도 동작 (물리 키 기준) |
-| **다운로드 · 외부 앱** | 다운로드는 OS 다운로드 폴더로. `f5-epi:`·`mailto:` 같은 외부 앱 링크는 확인 후 OS에 넘김 (사내 VPN 클라이언트 등) |
+| **다운로드** | 크롬처럼 툴바에 다운로드 버튼이 나타나 **원형 진행 링**으로 진행률을 보여 줌(크기를 모르면 회전, 끝나면 반짝). `kite://downloads`(버튼 클릭, `⌥⌘L` / `Ctrl+J`, 스포트라이트 `> 다운로드`): 받는 중(진행 막대·속도·남은 시간·**취소**), 날짜별 기록, 열기·**Finder/폴더에서 보기**·다시 받기·목록에서 삭제, 검색, **다운로드 폴더 열기**. 설정 → 일반에서 저장 위치 변경. 같은 이름은 `(1)`을 붙여 덮어쓰지 않음 |
+| **외부 앱** | 다운로드는 OS 다운로드 폴더로. `f5-epi:`·`mailto:` 같은 외부 앱 링크는 확인 후 OS에 넘김 (사내 VPN 클라이언트 등) |
 
 ## 화면
 
@@ -47,6 +48,10 @@ OS에 들어 있는 웹 엔진(Windows WebView2, macOS WKWebView)을 그대로 �
 | 사이트 정보 (인증서) | 주소창 자동완성 |
 |---|---|
 | ![사이트 정보](docs/screenshots/siteinfo.jpg) | ![주소창 자동완성](docs/screenshots/omnibox.jpg) |
+
+| 다운로드 관리자 (`kite://downloads`) | |
+|---|---|
+| ![다운로드](docs/screenshots/downloads.jpg) | 툴바의 다운로드 버튼에 원형 링으로 진행률이 표시되고(크기를 모르면 회전), 누르면 이 화면이 열립니다. 받는 중인 파일은 속도·남은 시간과 **취소**, 받은 파일은 **열기 / Finder(폴더)에서 보기**. |
 
 | 영상회의 | 테마 11개 |
 |---|---|
@@ -81,6 +86,7 @@ OS에 들어 있는 웹 엔진(Windows WebView2, macOS WKWebView)을 그대로 �
 | 북마크 | SQLite에 북마크·폴더, 트리 관리자(검색·접기·드래그 이동·빈 폴더), Chrome 계열 북마크 가져오기 | `store.rs`, `pages.rs`, `src/bookmarks` |
 | 확장 프로그램 | CRX 받기·풀기 → macOS `WKWebExtensionController`, Windows WebView2 `AddBrowserExtension`. 툴바 아이콘·팝업 | `extensions.rs`, `platform.rs` |
 | 비밀번호 관리자 | 폼 제출 감지 → 출처 재확인 후 저장 제안, AES-256-GCM 암호화, 키는 OS 키체인 | `passwords.rs` |
+| 다운로드 | Tauri는 시작·끝만 알려 줘서, macOS에선 wry 다운로드 델리게이트의 `decideDestinationUsingResponse`를 objc 런타임으로 감싸 `WKDownload`(진행률 `NSProgress`, 취소)와 응답의 전체 크기를 받음. Windows는 디스크의 파일 크기로 진행률(전체 크기 모름). 기록은 store에 최근 300개, 상태는 `downloads` 이벤트로 툴바(원형 링)·`kite://downloads`에 | `downloads.rs`, `platform.rs`, `src/downloads` |
 | AI 자동화 (MCP) | Streamable HTTP(127.0.0.1)+Bearer 토큰+Origin 거부, 도구 23개. 탭에 주입한 `content.js` 헬퍼를 `eval_with_callback`으로 실행 | `mcp.rs`, `automation.rs`, `inject/content.js` |
 
 ## 설치
@@ -144,6 +150,7 @@ Kite는 **Rust 코어 하나**와 **OS 웹 엔진으로 그리는 웹뷰 여러 
 | 사이트 정보 | `src-tauri/src/siteinfo.rs`, `src/siteinfo` | 인증서 체인 읽기·해석, 말풍선 창 |
 | 영상회의 | `src-tauri/src/meet.rs`, `src/meet` | 회의 서버(TCP+UPnP), 암호화 중계, WebRTC 메시 |
 | 로그인 유지 | `src-tauri/src/session_cookies.rs` | 세션 쿠키 저장·복원 |
+| 다운로드 | `src-tauri/src/downloads.rs`, `src/downloads` | 저장 위치·진행률·취소·기록, `kite://downloads` |
 | 플랫폼 | `src-tauri/src/platform.rs` | 네이티브 스크린샷(WKWebView takeSnapshot / WebView2 CapturePreview), 확장 엔진(WKWebExtensionController / WebView2), Windows z-order |
 | UI | `src/index`, `src/palette` | 탭줄·툴바·북마크 바, 팔레트 (TypeScript, 프레임워크 없음) |
 
@@ -221,6 +228,7 @@ git push origin main --tags
 | 페이지 | 여는 법 | 내용 |
 |---|---|---|
 | `kite://settings` | `⌘,` / `Ctrl+,`, 주소창에 `chrome://settings`, 스포트라이트 `> 설정` | 검색 엔진, 시작할 때 탭 복원, 북마크 바, MCP(켜기·포트·연결 명령·토큰 재발급), 방문 기록·쿠키 삭제, 단축키 목록 |
+| `kite://downloads` | `⌥⌘L` / `Ctrl+J`, 툴바 다운로드 버튼, 스포트라이트 `> 다운로드` | 받는 중·기록(날짜별), 열기·폴더에서 보기·취소·다시 받기·삭제, 검색, 다운로드 폴더 열기 |
 | `kite://bookmarks` | `⌘⌥B` / `Ctrl+Shift+O`, 북마크 바의 `모든 북마크` | 폴더 트리(검색·펼치기/접기·폭 조절, 끌어서 폴더 이동·순서 변경, 새 폴더·이름 바꾸기·삭제, 빈 폴더 유지), 폴더별로 묶인 목록, 북마크를 끌어서 폴더로 이동, 추가·편집·삭제, 다른 브라우저에서 가져오기 |
 
 - **북마크 바**: `⌘⇧B` / `Ctrl+Shift+B`로 켜고 끔. 폴더가 비어 있는 북마크(크롬의 북마크바에서 가져온 것 포함)가 링크로, 최상위 폴더가 📁 버튼으로 보이고, 폴더를 누르면 스포트라이트에 그 폴더의 북마크가 뜹니다(`*/폴더명`). 넘치는 항목은 `»`.
@@ -242,6 +250,7 @@ git push origin main --tags
 | 북마크 추가/삭제 | `⌘D` | `Ctrl+D` |
 | 북마크 바 / 북마크 관리자 / 설정 | `⌘⇧B` / `⌘⌥B` / `⌘,` | `Ctrl+Shift+B` / `Ctrl+Shift+O` / `Ctrl+,` |
 | 탭 검색 / 기록 검색 | `⌘⇧A` / `⌘Y` | `Ctrl+Shift+A` / `Ctrl+H` |
+| 다운로드 | `⌥⌘L` | `Ctrl+J` |
 | 확대 / 축소 / 원래대로 | `⌘=` / `⌘-` / `⌘0`, `⌃`+휠 | `Ctrl+=` / `Ctrl+-` / `Ctrl+0`, `Ctrl`+휠 |
 | 개발자 도구 | `F12`, `⌘⌥I` | `F12`, `Ctrl+Shift+I` |
 

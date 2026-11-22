@@ -106,6 +106,8 @@ function render() {
         <div class="row"><div class="label"><b>검색 엔진</b><small>주소창과 스포트라이트에서 주소가 아닌 글자를 입력했을 때</small></div>
           <select id="engine">${s.engines.map(([id, name]) => `<option value="${id}" ${id === s.searchEngine ? "selected" : ""}>${esc(name)}</option>`).join("")}</select></div>
         <div class="row"><div class="label"><b>시작할 때 이전 탭 다시 열기</b><small>끄면 새 탭 하나로 시작합니다</small></div>${sw("restore", s.restoreSession)}</div>
+        <div class="row"><div class="label"><b>다운로드 위치</b><small id="dl-dir">…</small></div>
+          <button class="btn" id="dl-open">폴더 열기</button><button class="btn" id="dl-pick">변경…</button><button class="btn" id="dl-reset" title="운영체제의 다운로드 폴더로">기본값</button></div>
         <div class="row"><div class="label"><b>어디서나 스포트라이트 열기</b><small>다른 앱을 쓰는 중에도 이 단축키를 누르면 Kite 검색창이 화면 위에 뜹니다(Spotlight·Everything처럼). Esc나 다른 곳을 누르면 닫힙니다. 단축키를 눌러 바꿀 수 있고, F1~F24는 하나만으로도 됩니다${isMac ? "(맥북 키보드는 fn과 함께)" : ""}.</small></div>
           <div class="shortcut-ctl">${s.launcherEnabled ? `<button class="btn kbd-btn" id="launcher-key" title="눌러서 다른 키로 바꾸기"><kbd>${esc(s.launcherLabel)}</kbd></button>${s.launcherShortcut !== s.launcherDefault ? `<button class="link-btn" id="launcher-reset" title="${esc(s.launcherDefaultLabel)}">기본값</button>` : ""}` : ""}${sw("launcher", s.launcherEnabled)}</div></div>
       </section>
@@ -444,6 +446,14 @@ function bind() {
   document.getElementById("launcher-key")?.addEventListener("click", recordShortcut);
   document.getElementById("launcher-reset")?.addEventListener("click", () => set("launcher_shortcut", "", "전역 단축키를 기본값으로 되돌렸습니다."));
   $<HTMLInputElement>("restore").onchange = (e) => set("restore_session", String((e.target as HTMLInputElement).checked));
+  call<{ dir: string }>("downloads_list").then((d) => d && ($("dl-dir").textContent = d.dir));
+  $("dl-open").onclick = () => call("downloads_open_dir");
+  const pickDir = async (reset: boolean) => {
+    const dir = await call<string>("downloads_pick_dir", { reset });
+    if (dir) $("dl-dir").textContent = dir;
+  };
+  $("dl-pick").onclick = () => pickDir(false);
+  $("dl-reset").onclick = () => pickDir(true);
   $<HTMLInputElement>("bbar").onchange = (e) => set("bookmark_bar", String((e.target as HTMLInputElement).checked));
   $<HTMLInputElement>("mcp").onchange = (e) => set("mcp_enabled", String((e.target as HTMLInputElement).checked));
   $("port-save").onclick = () => set("mcp_port", $<HTMLInputElement>("port").value);

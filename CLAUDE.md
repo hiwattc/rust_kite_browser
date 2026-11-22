@@ -16,6 +16,7 @@ Rust 브라우저. Tauri v2 + OS 웹뷰(Windows WebView2 / macOS WKWebView) + Vi
 - `src-tauri/src/neterror.rs` — 접속 불가: wry가 실패를 알려 주지 않아, Kite가 시작한 이동마다 `watch_failure`가 WKWebView `isLoading`을 봐서 commit 없이 멈추면 실패로 판단 → 직접 진단(DNS/TCP/TLS) → `neterror.html`(탭 `error`/`error_url`로 주소창엔 원래 주소). 9번 같은 WebKit 제한 포트는 about:blank로 commit되어 해당 없음. 인증서 예외: wry 내비게이션 델리게이트가 인증 챌린지를 처리하지 않아 `platform::install_cert_exceptions`가 그 클래스에 `webView:didReceiveAuthenticationChallenge:completionHandler:`를 추가하고 델리게이트를 다시 붙임(WebKit이 메서드 목록을 설정 시점에 캐시). 사용자가 `neterror_proceed`로 허용한 호스트만 서버 신뢰를 받아들이고 나머지는 기본 처리. 허용 목록은 메모리(재시작 시 초기화), 탭 `badCert`로 주소창 경고.
 - `src-tauri/src/meet.rs` — 영상회의 서버(호스트 Kite가 TCP로 열고 UPnP로 공유기 포트 개방, 초대 코드 키로 프레임 암호화, 참가 요청·수락·시그널링 중계). 페이지(`src/meet`)는 네트워크를 직접 쓰지 않고 `meet_*` 명령과 `meet` 이벤트만 씀.
 - `src-tauri/src/portal.rs` + `src/home` — `kite://home` 개인 포털. 페이지가 레이아웃·편집을 하고, 데이터(워크스페이스 → 섹션(`apps`|`todo`, 12칸 격자 `w`×`h`) JSON 하나, version 2; 예전 v1은 `normalize`가 변환)는 store kv `portal`에 저장. 사이트 아이콘은 Rust가 받아 data URL로(apple-touch-icon 우선). 내보내기/불러오기는 파일 대화상자.
+- `src-tauri/src/downloads.rs` + `src/downloads` — 다운로드 진행률·기록·`kite://downloads`. Tauri는 Requested/Finished만 줘서, macOS는 `platform::mac_download`가 wry 다운로드 델리게이트의 destination 메서드를 감싸 `WKDownload`(retain, 메인 스레드에서만 접근)와 expectedContentLength를 넘김 → 진행률·취소. 취소한 다운로드는 WebKit이 알려 주지 않아 직접 종료 처리. Windows는 파일 크기로만.
 - `src-tauri/src/pages.rs` — 내부 페이지(`kite://settings`, `kite://bookmarks`)용 명령.
 - `src/index`, `src/palette` — 탭줄/툴바·북마크 바, 팔레트(각자 웹뷰). `src/newtab`, `src/settings`, `src/bookmarks` — 탭 안에 뜨는 내부 페이지(`src/shared/page.ts` 공통).
 
@@ -34,7 +35,7 @@ Rust 브라우저. Tauri v2 + OS 웹뷰(Windows WebView2 / macOS WKWebView) + Vi
 
 ## 확인 명령
 - Rust: `cd src-tauri && cargo clippy --all-targets && cargo test --lib`
-- Windows 컴파일 확인: `cd src-tauri && CARGO_TARGET_DIR=target/xwin cargo xwin clippy --target x86_64-pc-windows-msvc`
+- Windows 컴파일 확인: `cd src-tauri && CARGO_TARGET_DIR=target/xwin cargo xwin clippy --all-targets --target x86_64-pc-windows-msvc` (CI처럼 테스트 포함)
 - 프론트: `npx tsc --noEmit`
 - 실행: `npx tauri dev` (dev 서버 포트 1440)
 - MCP 수동 호출: 토큰은 macOS `~/Library/Application Support/com.kite.browser/mcp-token`, Windows `%APPDATA%\com.kite.browser\mcp-token`

@@ -249,7 +249,7 @@ pub fn toast(app: &AppHandle, msg: impl Into<String>) {
 }
 
 /// Kite's own pages shown in tabs: `kite://<name>` ↔ `<name>.html` of the app.
-pub const INTERNAL: [&str; 6] = ["newtab", "settings", "bookmarks", "meet", "neterror", "home"];
+pub const INTERNAL: [&str; 7] = ["newtab", "settings", "bookmarks", "meet", "neterror", "home", "downloads"];
 
 /// Which internal page an app URL is (dev server or bundled assets).
 fn internal_page(u: &url::Url) -> Option<&'static str> {
@@ -274,6 +274,7 @@ pub fn kite_page(input: &str) -> Option<&'static str> {
         "newtab" | "new-tab-page" | "blank" => "newtab",
         "settings" | "preferences" | "prefs" | "extensions" | "extension" | "passwords" | "password-manager" => "settings",
         "bookmarks" | "favorites" => "bookmarks",
+        "downloads" | "download" => "downloads",
         "meet" | "meeting" | "call" => "meet",
         "home" | "portal" => "home",
         _ => return None,
@@ -623,7 +624,10 @@ impl Browser {
             .map_err(err)?;
         let _ = side.hide();
         let b = self.clone();
-        window.on_window_event(move |e| match e {
+        window.on_window_event(move |e| {
+            crate::diag::event();
+            crate::diag::mark(format!("win {n}: {}", event_name(e)));
+            match e {
             tauri::WindowEvent::Resized(_) | tauri::WindowEvent::ScaleFactorChanged { .. } => {
                 b.layout(n);
                 if let Some(w) = b.window(n) {
@@ -644,6 +648,7 @@ impl Browser {
             tauri::WindowEvent::CloseRequested { .. } => b.window_closing(n),
             tauri::WindowEvent::Destroyed => b.window_gone(n),
             _ => {}
+            }
         });
         Ok(n)
     }
@@ -1097,20 +1102,25 @@ impl Browser {
 
     fn download_event(&self, event: tauri::webview::DownloadEvent<'_>) -> bool {
         use tauri::webview::DownloadEvent;
+        let downloads = self.0.app.state::<crate::downloads::Downloads>();
         match event {
             DownloadEvent::Requested { url, destination } => {
                 let name = destination.file_name().map(|n| n.to_string_lossy().to_string()).filter(|n| !n.is_empty()).unwrap_or_else(|| {
                     url.path_segments().and_then(|mut s| s.next_back().map(str::to_string)).filter(|s| !s.is_empty()).unwrap_or_else(|| "download".into())
                 });
-                if let Some(dir) = dirs::download_dir() {
-                    *destination = unique_path(&dir, &name);
-                }
-                toast(&self.0.app, format!("다운로드 시작: {name}"));
+                *destination = downloads.requested(&self.0.app, url.as_str(), &name);
+                tracing::info!(file = %destination.display(), "download started");
             }
-            DownloadEvent::Finished { path, success, .. } => {
-                let name = path.as_ref().and_then(|p| p.file_name()).map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
-                let msg = if success { format!("다운로드 완료: {name}") } else { format!("다운로드 실패: {name}") };
-                toast(&self.0.app, msg);
+            DownloadEvent::Finished { url, success, .. } => {
+                if let Some(d) = downloads.finished(&self.0.app, url.as_str(), success) {
+                    tracing::info!(file = %d.path, state = ?d.state, "download ended");
+                    let msg = match d.state {
+                        crate::downloads::DlState::Done => format!("다운로드 완료: {}", d.name),
+                        crate::downloads::DlState::Canceled => format!("다운로드 취소: {}", d.name),
+                        _ => format!("다운로드 실패: {}", d.name),
+                    };
+                    toast(&self.0.app, msg);
+                }
             }
             _ => {}
         }
@@ -2055,17 +2065,17 @@ impl Browser {
     }
 }
 
-fn unique_path(dir: &std::path::Path, name: &str) -> std::path::PathBuf {
-    let name: String = name.chars().map(|c| if matches!(c, '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|') { '_' } else { c }).collect();
-    let p = dir.join(&name);
-    if !p.exists() {
-        return p;
+fn event_name(e: &tauri::WindowEvent) -> &'static str {
+    match e {
+        tauri::WindowEvent::Resized(_) => "Resized",
+        tauri::WindowEvent::Moved(_) => "Moved",
+        tauri::WindowEvent::Focused(true) => "Focused(true)",
+        tauri::WindowEvent::Focused(false) => "Focused(false)",
+        tauri::WindowEvent::ScaleFactorChanged { .. } => "ScaleFactorChanged",
+        tauri::WindowEvent::CloseRequested { .. } => "CloseRequested",
+        tauri::WindowEvent::Destroyed => "Destroyed",
+        _ => "other",
     }
-    let (stem, ext) = match name.rsplit_once('.') {
-        Some((s, e)) if !s.is_empty() => (s.to_string(), format!(".{e}")),
-        _ => (name.clone(), String::new()),
-    };
-    (1..1000).map(|i| dir.join(format!("{stem} ({i}){ext}"))).find(|p| !p.exists()).unwrap_or(p)
 }
 
 #[cfg(test)]
@@ -2116,15 +2126,4 @@ mod tests {
         assert_eq!(kite_page("https://settings.com"), None);
     }
 
-    #[test]
-    fn unique_download_names() {
-        let dir = std::env::temp_dir().join(format!("kite-dl-{}", std::process::id()));
-        std::fs::create_dir_all(&dir).unwrap();
-        let a = unique_path(&dir, "a.txt");
-        assert_eq!(a.file_name().unwrap(), "a.txt");
-        std::fs::write(&a, "x").unwrap();
-        assert_eq!(unique_path(&dir, "a.txt").file_name().unwrap(), "a (1).txt");
-        assert_eq!(unique_path(&dir, "b/c?.txt").file_name().unwrap(), "b_c_.txt");
-        let _ = std::fs::remove_dir_all(&dir);
-    }
 }

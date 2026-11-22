@@ -51,6 +51,8 @@
     "allow-site-info",
     "allow-site-info-size",
     "allow-site-info-close",
-    "allow-copy-text"
+    "allow-copy-text",
+    "allow-downloads-list",
+    "allow-downloads-page"
   ]
 }

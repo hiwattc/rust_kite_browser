@@ -95,3 +95,21 @@ body { height: auto; background: var(--bg-toolbar); }
 .omni-icon.clickable { width: 24px; height: 24px; margin-left: -6px; border-radius: 50%; display: grid; place-items: center; cursor: pointer; }
 .omni-icon.clickable:hover { background: var(--bg-hover); color: var(--text); }
 .omni-icon.insecure { color: #d33a3f; }
+
+/* Download button: a ring around the arrow shows progress (like Chrome). */
+.tb.dl { position: relative; }
+.tb.dl[hidden] { display: none; }
+.tb.dl .ring { position: absolute; inset: 0; width: 32px; height: 32px; transform: rotate(-90deg); pointer-events: none; }
+.tb.dl .ring circle { fill: none; stroke-width: 2.4; }
+.tb.dl .ring .track { stroke: transparent; }
+.tb.dl .ring .bar { stroke: var(--accent); stroke-linecap: round; transition: stroke-dashoffset .35s ease; opacity: 0; }
+.tb.dl.active { color: var(--accent); }
+.tb.dl.active .ring .track { stroke: var(--accent-soft); }
+.tb.dl.active .ring .bar { opacity: 1; }
+.tb.dl.unknown .ring { animation: dl-spin 1s linear infinite; }
+@keyframes dl-spin { from { transform: rotate(-90deg); } to { transform: rotate(270deg); } }
+.tb.dl .icon { width: 15px; height: 15px; }
+.tb.dl.active .icon { animation: dl-bob 1.2s ease-in-out infinite; }
+@keyframes dl-bob { 50% { transform: translateY(1.5px); } }
+.tb.dl.finished { animation: dl-done .9s ease; }
+@keyframes dl-done { 0% { box-shadow: 0 0 0 0 var(--accent-soft); background: var(--accent-soft); color: var(--accent); } 100% { box-shadow: 0 0 0 10px transparent; } }

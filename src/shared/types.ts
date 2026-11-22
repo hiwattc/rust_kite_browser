@@ -19,6 +19,27 @@ export interface McpStatus {
   url: string;
 }
 
+export interface DownloadItem {
+  id: number;
+  url: string;
+  name: string;
+  path: string;
+  total: number;
+  received: number;
+  state: "progress" | "done" | "failed" | "canceled";
+  started: number;
+  ended: number | null;
+  missing: boolean;
+  cancelable: boolean;
+}
+export interface DownloadsSnapshot {
+  items: DownloadItem[];
+  /** 0..1 over active downloads, -1 when a size is unknown. */
+  progress: number;
+  active: number;
+  dir: string;
+}
+
 export interface BrowserState {
   tabs: Tab[];
   active: number | null;

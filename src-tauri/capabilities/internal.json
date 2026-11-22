@@ -48,6 +48,11 @@
     "allow-portal-icon",
     "allow-portal-export",
     "allow-portal-import",
-    "allow-neterror-proceed"
+    "allow-neterror-proceed",
+    "allow-downloads-list",
+    "allow-download-action",
+    "allow-downloads-clear",
+    "allow-downloads-open-dir",
+    "allow-downloads-pick-dir"
   ]
 }

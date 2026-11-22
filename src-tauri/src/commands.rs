@@ -94,6 +94,7 @@ pub async fn run_action(app: &AppHandle, action: &str) -> Result<(), AppError> {
         "search_tabs" => b.open_palette("@", "")?,
         "open_settings" => b.open_internal("settings")?,
         "open_bookmarks" => b.open_internal("bookmarks")?,
+        "open_downloads" => b.open_internal("downloads")?,
         "open_meet" => b.open_internal("meet")?,
         "open_home" => b.open_internal("home")?,
         "open_passwords" => {

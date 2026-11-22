@@ -7,7 +7,7 @@ const wv = getCurrentWebview();
 const listen: typeof wv.listen = (...a) => wv.listen(...a);
 import { combo } from "../shared/keys";
 import { icons } from "../shared/icons";
-import { NEWTAB, type BarItem, type BrowserState, type Init, type Tab, type ToolbarExt } from "../shared/types";
+import { NEWTAB, type BarItem, type BrowserState, type DownloadsSnapshot, type Init, type Tab, type ToolbarExt } from "../shared/types";
 import "./chrome.css";
 import { initTheme } from "../shared/theme";
 
@@ -39,6 +39,10 @@ document.body.innerHTML = `
     <div class="toast" id="toast" hidden></div>
     <div class="agent" id="agent" hidden title="AI 에이전트가 이 브라우저를 조작하고 있습니다">${icons.bot}<span id="agent-text">에이전트</span></div>
     <button class="mcp" id="mcp" title="MCP 서버 (클릭: Claude Code 연결 명령 복사)"><span class="dot"></span>MCP</button>
+    <button class="tb dl" id="dl" hidden title="다운로드">
+      <svg class="ring" viewBox="0 0 32 32"><circle class="track" cx="16" cy="16" r="13"/><circle class="bar" id="dl-bar" cx="16" cy="16" r="13"/></svg>
+      ${icons.download}
+    </button>
     <button class="tb" id="home" title="홈 (개인 포털)">${icons.home}</button>
     <button class="tb" id="settings" title="설정 (${navigator.platform.toLowerCase().includes("mac") ? "⌘," : "Ctrl+,"})">${icons.settings}</button>
     <button class="tb" id="menu" title="메뉴: 설정·북마크·명령 (Ctrl+Shift+P → >)">${icons.menu}</button>
@@ -294,6 +298,34 @@ $("#omni-icon").addEventListener("mousedown", (e) => {
   invoke("site_info_open", { x: Math.round(r.left), y: Math.round(r.bottom) }).catch((err) => toast(String(err)));
 });
 $("#side").onclick = () => invoke("shortcut", { action: "toggle_side_tabs" }).catch((err) => toast(String(err)));
+// Downloads: the button appears with the first download of this run; its ring shows progress
+// (spins when the size is unknown) and it pulses when one finishes. Click: kite://downloads.
+const runStart = Date.now();
+let dlWasActive = 0;
+function renderDownloads(d: DownloadsSnapshot) {
+  const btn = $("#dl") as HTMLButtonElement;
+  const mine = d.items.filter((x) => x.started >= runStart);
+  btn.hidden = !mine.length && !d.active;
+  const C = 2 * Math.PI * 13;
+  const bar = $("#dl-bar") as unknown as SVGCircleElement;
+  btn.classList.toggle("active", d.active > 0);
+  btn.classList.toggle("unknown", d.active > 0 && d.progress < 0);
+  const frac = d.active > 0 ? (d.progress < 0 ? 0.25 : Math.max(0.03, d.progress)) : 0;
+  bar.style.strokeDasharray = `${C}`;
+  bar.style.strokeDashoffset = `${C * (1 - frac)}`;
+  if (dlWasActive > d.active && d.active === 0) {
+    btn.classList.remove("finished");
+    void btn.offsetWidth;
+    btn.classList.add("finished");
+  }
+  dlWasActive = d.active;
+  const cur = d.items.filter((x) => x.state === "progress");
+  const size = (n: number) => (n >= 1 << 30 ? `${(n / (1 << 30)).toFixed(1)}GB` : n >= 1 << 20 ? `${(n / (1 << 20)).toFixed(1)}MB` : `${Math.max(1, Math.round(n / 1024))}KB`);
+  btn.title = cur.length
+    ? `다운로드 중 ${cur.length}개 · ${cur.map((x) => `${x.name} ${x.total > 0 ? `${Math.floor((x.received / x.total) * 100)}%` : size(x.received)}`).join(", ")}`
+    : "다운로드 기록 보기";
+}
+$("#dl").onclick = () => invoke("downloads_page").catch((err) => toast(String(err)));
 $("#home").onclick = () => invoke("shortcut", { action: "open_home" }).catch((err) => toast(String(err)));
 $("#settings").onclick = () => invoke("shortcut", { action: "open_settings" }).catch((err) => toast(String(err)));
 $("#mcp").onclick = () => invoke("shortcut", { action: "mcp_copy" });
@@ -553,6 +585,8 @@ async function main() {
   await listen<{ tabId: number; tool: string }>("agent-activity", (e) => agentActivity(e.payload.tool));
   await listen<BarItem[] | null>("bookmark-bar", (e) => renderBar(e.payload));
   await listen<ToolbarExt[]>("extensions", (e) => renderExts(e.payload));
+  await listen<DownloadsSnapshot>("downloads", (e) => renderDownloads(e.payload));
+  invoke<DownloadsSnapshot>("downloads_list").then(renderDownloads).catch(() => {});
   const init = await invoke<Init>("ui_init");
   keymap = init.keymap;
   document.documentElement.dataset.platform = init.platform;

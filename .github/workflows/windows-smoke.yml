@@ -1,0 +1,69 @@
+name: Windows smoke test
+
+# Builds Kite on Windows, starts it, and checks that the UI keeps answering (Windows marks a
+# window "Not Responding" when its thread stops handling messages). Uploads kite.log, which has
+# the main-thread watchdog's report if it stalls.
+on:
+  workflow_dispatch:
+  push:
+    branches: ["diag/**"]
+
+jobs:
+  smoke:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          key: smoke
+      - run: npm ci
+      - run: npm run build
+      - name: Build (release, no installer)
+        working-directory: src-tauri
+        run: cargo build --release
+      - name: Start Kite and watch it
+        shell: pwsh
+        run: |
+          $env:RUST_LOG = "kite_lib=debug"
+          $p = Start-Process -FilePath "src-tauri\target\release\kite.exe" -PassThru
+          $hung = 0
+          foreach ($i in 1..45) {
+            Start-Sleep -Seconds 1
+            $p.Refresh()
+            if ($p.HasExited) { Write-Host "Kite exited with code $($p.ExitCode) after $i s"; break }
+            if (-not $p.Responding) { $hung++; Write-Host "t=$i s: NOT RESPONDING" } else { Write-Host "t=$i s: ok (window '$($p.MainWindowTitle)')" }
+          }
+          # Ask the running app something through its MCP server (needs the main thread).
+          $tokenFile = Join-Path $env:APPDATA "com.kite.browser\mcp-token"
+          if (Test-Path $tokenFile) {
+            $token = (Get-Content $tokenFile -Raw).Trim()
+            $body = '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"smoke","version":"1"}}}'
+            try {
+              $r = Invoke-WebRequest -Uri "http://127.0.0.1:17321/mcp" -Method Post -Body $body -ContentType "application/json" -Headers @{ Authorization = "Bearer $token"; Accept = "application/json, text/event-stream" } -TimeoutSec 10
+              Write-Host "MCP initialize: HTTP $($r.StatusCode)"
+            } catch { Write-Host "MCP call failed: $_" }
+          }
+          if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force }
+          Write-Host "not-responding samples: $hung"
+          "HUNG=$hung" | Out-File -Append $env:GITHUB_ENV
+      - name: Show kite.log
+        if: always()
+        shell: pwsh
+        run: |
+          $log = Join-Path $env:APPDATA "com.kite.browser\kite.log"
+          if (Test-Path $log) { Get-Content $log } else { Write-Host "no log at $log" }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: kite-windows-log
+          path: ${{ env.APPDATA }}\com.kite.browser\kite*.log
+      - name: Fail when the UI hung
+        if: env.HUNG != '0'
+        run: exit 1

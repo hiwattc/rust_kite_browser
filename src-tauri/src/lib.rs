@@ -16,6 +16,8 @@ mod omnibox;
 mod pages;
 mod palette;
 mod passwords;
+mod diag;
+mod downloads;
 mod platform;
 mod portal;
 mod session_cookies;
@@ -78,11 +80,14 @@ fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let handle = app.handle().clone();
     let data = app.path().app_data_dir()?;
     let store = Arc::new(Store::open(&data.join("kite.db"))?);
+    diag::watchdog(handle.clone());
     let browser = Browser::new(handle.clone(), store.clone());
     app.manage(browser.clone());
     app.state::<McpHub>().set_app(handle.clone());
 
+    diag::mark("setup: create window 1");
     browser.create_window(None, None)?; // window 1 = `main`
+    tracing::info!("window 1 created");
 
     for (ext, dir) in extensions::list(&handle) {
         platform::ext_load(&handle, &ext.id, &dir);
@@ -92,17 +97,23 @@ fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let b = browser.clone();
     std::thread::spawn(move || {
         session_cookies::restore(&b);
+        tracing::info!("session cookies step done");
         let b2 = b.clone();
         let _ = b.0.app.run_on_main_thread(move || {
+            diag::mark("startup: restore tabs");
             if let Err(e) = b2.restore_session() {
                 tracing::warn!(error = %e.detail, "session restore failed");
             }
+            diag::mark("startup: layout");
             b2.layout_all();
             b2.start_shots();
+            diag::mark("startup: launcher shortcut");
             if let Err(e) = launcher::apply(&b2.0.app) {
                 commands::toast(&b2, e.user_message);
             }
             session_cookies::start(b2);
+            diag::mark("startup: done");
+            tracing::info!("startup finished on the main thread");
         });
     });
 
@@ -119,10 +130,8 @@ fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tracing_subscriber::fmt()
-        .with_env_filter(tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "kite_lib=info".into()))
-        .init();
-    let builder = tauri::Builder::default().manage(McpHub::default());
+    diag::init_logging();
+    let builder = tauri::Builder::default().manage(McpHub::default()).manage(downloads::Downloads::default());
     // macOS may end a hidden tab's page process to free memory. Tauri's default reloads it at
     // once; Kite waits until the tab is shown and puts its last picture up meanwhile.
     #[cfg(target_os = "macos")]
@@ -171,6 +180,12 @@ pub fn run() {
             neterror::neterror_retry,
             neterror::neterror_search,
             neterror::neterror_proceed,
+            downloads::downloads_list,
+            downloads::download_action,
+            downloads::downloads_clear,
+            downloads::downloads_open_dir,
+            downloads::downloads_pick_dir,
+            downloads::downloads_page,
             portal::portal_get,
             portal::portal_set,
             portal::portal_seed,
