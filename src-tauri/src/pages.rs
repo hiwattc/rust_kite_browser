@@ -107,6 +107,8 @@ pub async fn settings_get(app: AppHandle) -> Result<Settings, AppError> {
 /// Changes one setting (fixed set of keys) and applies it.
 #[tauri::command]
 pub async fn settings_set(app: AppHandle, key: String, value: String) -> Result<Settings, AppError> {
+    crate::diag::mark(format!("settings: {key}"));
+    tracing::info!(%key, "setting changed");
     let b = app.state::<Browser>().inner().clone();
     let store = &b.0.store;
     match key.as_str() {
@@ -117,8 +119,15 @@ pub async fn settings_set(app: AppHandle, key: String, value: String) -> Result<
             store.set("search_engine", &value)?;
         }
         "launcher_enabled" => {
-            store.set("launcher_enabled", if value == "true" { "true" } else { "false" })?;
-            crate::launcher::apply(&app)?;
+            let on = value == "true";
+            store.set("launcher_enabled", if on { "true" } else { "false" })?;
+            if let Err(e) = crate::launcher::apply(&app) {
+                // Not registered: saved as off too, so the switch never shows a state that is not real.
+                if on {
+                    store.set("launcher_enabled", "false")?;
+                }
+                return Err(e);
+            }
         }
         "launcher_shortcut" => {
             let old = crate::launcher::shortcut(&b);

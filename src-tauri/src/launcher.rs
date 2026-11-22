@@ -41,13 +41,17 @@ pub fn shortcut(b: &Browser) -> String {
 pub fn apply(app: &AppHandle) -> Result<(), AppError> {
     let b = app.state::<Browser>().inner().clone();
     let gs = app.global_shortcut();
-    if let Some(old) = CURRENT.lock().unwrap().take() {
-        let _ = gs.unregister(old.as_str());
+    let old = CURRENT.lock().unwrap().take();
+    if let Some(old) = old {
+        crate::diag::mark(format!("launcher: unregister {old}"));
+        let r = gs.unregister(old.as_str());
+        tracing::info!(shortcut = %old, ok = r.is_ok(), "launcher shortcut unregistered");
     }
     if !enabled(&b) {
         return Ok(());
     }
     let sc = shortcut(&b);
+    crate::diag::mark(format!("launcher: register {sc}"));
     gs.on_shortcut(sc.as_str(), |app, _, e| {
         if e.state == ShortcutState::Pressed {
             toggle(app);
@@ -56,13 +60,17 @@ pub fn apply(app: &AppHandle) -> Result<(), AppError> {
     .map_err(|e| AppError::new(format!("전역 단축키 {}를 등록하지 못했습니다. 다른 앱이 쓰고 있을 수 있습니다. 설정에서 다른 조합을 고르세요.", label(&sc)), e))?;
     tracing::info!(shortcut = %sc, "launcher shortcut registered");
     *CURRENT.lock().unwrap() = Some(sc);
-    // Made now (hidden), so the first press shows a ready page, not a blank window.
+    // Made now (hidden), so the first press shows a ready page, not a blank window. From a
+    // background task: building a webview window on the main thread (inside an event-loop
+    // callback) can deadlock on Windows; from here Tauri hands it to the main thread itself.
     let a = app.clone();
-    let _ = app.run_on_main_thread(move || {
-        if window(&a).is_none()
-            && let Err(e) = create(&a)
-        {
-            tracing::warn!(error = %e.detail, "launcher window");
+    tauri::async_runtime::spawn(async move {
+        if window(&a).is_none() {
+            crate::diag::mark("launcher: create window");
+            match create(&a) {
+                Ok(_) => tracing::info!("launcher window created"),
+                Err(e) => tracing::warn!(error = %e.detail, "launcher window"),
+            }
         }
     });
     Ok(())
@@ -139,19 +147,34 @@ pub fn toggle(app: &AppHandle) {
             return;
         }
         tracing::info!("launcher: shortcut → show");
-        if let Err(e) = show(&a) {
-            tracing::warn!(error = %e.detail, "launcher");
+        if window(&a).is_some() {
+            if let Err(e) = show(&a) {
+                tracing::warn!(error = %e.detail, "launcher");
+            }
+            return;
         }
+        // Not made yet: make it off the main thread (see `apply`), then show it there.
+        let a2 = a.clone();
+        tauri::async_runtime::spawn(async move {
+            crate::diag::mark("launcher: create window (first press)");
+            if let Err(e) = create(&a2) {
+                tracing::warn!(error = %e.detail, "launcher window");
+                return;
+            }
+            let a3 = a2.clone();
+            let _ = a2.run_on_main_thread(move || {
+                if let Err(e) = show(&a3) {
+                    tracing::warn!(error = %e.detail, "launcher");
+                }
+            });
+        });
     });
 }
 
 fn show(app: &AppHandle) -> Result<(), AppError> {
     let b = app.state::<Browser>().inner().clone();
     KITE_WAS_ACTIVE.store(b.wins().into_iter().filter_map(|n| b.window(n)).any(|w| w.is_focused().unwrap_or(false)), Ordering::SeqCst);
-    let w = match window(app) {
-        Some(w) => w,
-        None => create(app)?,
-    };
+    let w = window(app).ok_or_else(|| AppError::new("검색 창이 아직 준비되지 않았습니다.", "no launcher window"))?;
     place(app, &w);
     let _ = w.emit_to(LABEL, "palette-open", serde_json::json!({ "mode": "", "query": "" }));
     let _ = w.show();
