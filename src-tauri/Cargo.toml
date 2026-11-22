@@ -1,6 +1,6 @@
 [package]
 name = "kite"
-version = "0.2.0"
+version = "0.2.1"
 description = "Kite: a small Rust browser with a spotlight palette and an MCP automation server"
 edition = "2024"
 

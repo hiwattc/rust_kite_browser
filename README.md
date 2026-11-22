@@ -199,6 +199,7 @@ Kite가 직접 쓰는 오픈소스입니다(간접 의존성 포함 Rust 크레�
 | 워크플로 | 언제 | 하는 일 |
 |---|---|---|
 | [CI](.github/workflows/ci.yml) | `main` 푸시, PR | macOS·Windows에서 `npm run build`(tsc + vite), `cargo clippy -D warnings`, `cargo test` |
+| [Windows smoke test](.github/workflows/windows-smoke.yml) | `diag/**` 브랜치 푸시, 수동 | Windows에서 빌드해 실행하고 MCP 조작·실제 클릭·타이핑 후 응답 없음·이벤트 폭주·멈춤을 검사, `kite.exe`·로그·화면 캡처를 올림 |
 | [Release](.github/workflows/release.yml) | `v*` 태그 푸시 | macOS(Apple Silicon·Intel) `.dmg`, Windows `.exe`를 빌드해 GitHub Release에 올림 ([tauri-action](https://github.com/tauri-apps/tauri-action)) |
 
 새 버전 내기:
@@ -304,6 +305,8 @@ Kite를 켜면 MCP 서버가 `http://127.0.0.1:17321/mcp`에서 자동으로 시
 - 프로필은 아직 없습니다. 팝업 창은 MCP 도구로 조작할 수 없고 비밀번호 저장·자동 입력이 되지 않습니다.
 
 ## 데이터 위치
+
+- 로그: 앱 데이터 폴더의 `kite.log` (Windows `%APPDATA%\com.kite.browser\kite.log`, macOS `~/Library/Application Support/com.kite.browser/kite.log`). 직전 실행은 `kite.prev.log`. 문제가 생기면 이 파일을 보내 주세요.
 
 | 내용 | 위치 |
 |---|---|
