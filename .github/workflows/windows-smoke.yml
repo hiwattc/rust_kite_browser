@@ -25,9 +25,10 @@ jobs:
           key: smoke
       - run: npm ci
       - run: npm run build
+      # What `tauri build` does (pages from the bundled files, not the dev server), minus the installer.
       - name: Build (release, no installer)
         working-directory: src-tauri
-        run: cargo build --release
+        run: cargo build --release --features tauri/custom-protocol
       - name: Start Kite and watch it
         shell: pwsh
         run: |
@@ -40,15 +41,37 @@ jobs:
             if ($p.HasExited) { Write-Host "Kite exited with code $($p.ExitCode) after $i s"; break }
             if (-not $p.Responding) { $hung++; Write-Host "t=$i s: NOT RESPONDING" } else { Write-Host "t=$i s: ok (window '$($p.MainWindowTitle)')" }
           }
-          # Ask the running app something through its MCP server (needs the main thread).
+          # Use it like a person would, through its MCP server (each call needs the main thread).
           $tokenFile = Join-Path $env:APPDATA "com.kite.browser\mcp-token"
-          if (Test-Path $tokenFile) {
+          if (-not $p.HasExited -and (Test-Path $tokenFile)) {
             $token = (Get-Content $tokenFile -Raw).Trim()
-            $body = '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"smoke","version":"1"}}}'
-            try {
-              $r = Invoke-WebRequest -Uri "http://127.0.0.1:17321/mcp" -Method Post -Body $body -ContentType "application/json" -Headers @{ Authorization = "Bearer $token"; Accept = "application/json, text/event-stream" } -TimeoutSec 10
-              Write-Host "MCP initialize: HTTP $($r.StatusCode)"
-            } catch { Write-Host "MCP call failed: $_" }
+            $h = @{ Authorization = "Bearer $token"; Accept = "application/json, text/event-stream" }
+            $url = "http://127.0.0.1:17321/mcp"
+            function Rpc($body) {
+              try {
+                $r = Invoke-WebRequest -Uri $url -Method Post -Body $body -ContentType "application/json" -Headers $h -TimeoutSec 20
+                if ($r.Headers["Mcp-Session-Id"]) { $script:h["Mcp-Session-Id"] = "$($r.Headers["Mcp-Session-Id"])" }
+                $text = "$($r.Content)"; if ($text.Length -gt 300) { $text = $text.Substring(0, 300) }
+                Write-Host "  -> HTTP $($r.StatusCode) $text"
+              } catch { Write-Host "  -> FAILED: $_" }
+            }
+            Write-Host "MCP initialize"; Rpc '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"smoke","version":"1"}}}'
+            Rpc '{"jsonrpc":"2.0","method":"notifications/initialized"}'
+            $calls = @(
+              '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"browser_tabs","arguments":{"action":"list"}}}',
+              '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"browser_navigate","arguments":{"url":"https://example.com/"}}}',
+              '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"browser_snapshot","arguments":{}}}',
+              '{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"browser_tabs","arguments":{"action":"new","url":"kite://home"}}}',
+              '{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"browser_navigate","arguments":{"url":"kite://settings"}}}',
+              '{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"browser_tabs","arguments":{"action":"list"}}}'
+            )
+            foreach ($c in $calls) {
+              Write-Host "MCP $($c.Substring(60, [Math]::Min(80, $c.Length - 60)))"; Rpc $c
+              Start-Sleep -Seconds 2; $p.Refresh()
+              if ($p.HasExited) { Write-Host "Kite exited with code $($p.ExitCode)"; break }
+              if (-not $p.Responding) { $hung++; Write-Host "  NOT RESPONDING after this call" }
+            }
+            foreach ($i in 1..10) { Start-Sleep -Seconds 1; $p.Refresh(); if (-not $p.HasExited -and -not $p.Responding) { $hung++; Write-Host "t+$i s: NOT RESPONDING" } }
           }
           if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force }
           Write-Host "not-responding samples: $hung"
