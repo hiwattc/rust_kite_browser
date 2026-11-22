@@ -579,6 +579,11 @@ impl Browser {
         // macOS: tabs in the title bar area, next to the traffic lights.
         #[cfg(target_os = "macos")]
         let wb = wb.title_bar_style(tauri::TitleBarStyle::Overlay).hidden_title(true);
+        // Windows: no title bar, the tabs are the top of the window (like Chrome/Edge); the tab
+        // strip draws minimize/maximize/close and is the drag area. The shadow doubles as the
+        // left/right/bottom resize border; the strip handles the top edge.
+        #[cfg(windows)]
+        let wb = wb.decorations(false).shadow(true);
         let t0 = std::time::Instant::now();
         let step = |what: &str| {
             crate::diag::mark(format!("window {n}: {what} ({}ms)", t0.elapsed().as_millis()));

@@ -22,7 +22,8 @@ use crate::error::AppError;
 pub const LABEL: &str = "launcher";
 const WIDTH: f64 = 680.0;
 
-pub const DEFAULT_SHORTCUT: &str = if cfg!(target_os = "macos") { "Alt+Space" } else { "Ctrl+Alt+Space" };
+/// Windows: F9 on its own (Ctrl+Alt+Space is often taken by IME or other tools there).
+pub const DEFAULT_SHORTCUT: &str = if cfg!(target_os = "macos") { "Alt+Space" } else { "F9" };
 
 /// The shortcut registered now (to unregister it when it changes).
 static CURRENT: Mutex<Option<String>> = Mutex::new(None);

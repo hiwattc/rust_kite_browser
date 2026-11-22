@@ -90,6 +90,10 @@ jobs:
             [DllImport("user32.dll")] public static extern bool SetCursorPos(int x, int y);
             [DllImport("user32.dll")] public static extern void mouse_event(uint f, uint x, uint y, uint d, IntPtr e);
             [DllImport("user32.dll")] public static extern uint GetDpiForWindow(IntPtr h);
+            [DllImport("user32.dll")] public static extern bool IsZoomed(IntPtr h);
+            [DllImport("user32.dll")] public static extern bool IsIconic(IntPtr h);
+            [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int c);
+            public static void Drag(int x, int y, int dx, int dy) { SetCursorPos(x, y); mouse_event(2, 0, 0, 0, IntPtr.Zero); System.Threading.Thread.Sleep(120); for (int i = 1; i <= 10; i++) { SetCursorPos(x + dx * i / 10, y + dy * i / 10); System.Threading.Thread.Sleep(30); } System.Threading.Thread.Sleep(120); mouse_event(4, 0, 0, 0, IntPtr.Zero); }
             public static void Click(int x, int y) { SetCursorPos(x, y); mouse_event(2, 0, 0, 0, IntPtr.Zero); mouse_event(4, 0, 0, 0, IntPtr.Zero); }
           }
           "@
@@ -114,6 +118,31 @@ jobs:
               if (-not $p.Responding) { $hung++ }
             }
             foreach ($i in 1..8) { Start-Sleep -Seconds 1; $p.Refresh(); if (-not $p.HasExited -and -not $p.Responding) { $hung++; Write-Host "after clicks t+$i s: NOT RESPONDING" } }
+            # Window frame (no title bar on Windows): buttons, drag, maximize, resize edges.
+            function Shot($name) { $b = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds; $bmp = New-Object System.Drawing.Bitmap $b.Width, $b.Height; $g = [System.Drawing.Graphics]::FromImage($bmp); $g.CopyFromScreen($b.Location, [System.Drawing.Point]::Empty, $b.Size); $bmp.Save("$env:RUNNER_TEMP\$name.png") }
+            function Rect() { $q = New-Object U+R; [U]::GetWindowRect($hw, [ref]$q) | Out-Null; $q }
+            function Show($label) { $q = Rect; Write-Host "$label rect=$($q.L),$($q.T)-$($q.Rt),$($q.B) zoomed=$([U]::IsZoomed($hw)) iconic=$([U]::IsIconic($hw))" }
+            [U]::SetForegroundWindow($hw) | Out-Null; Start-Sleep -Milliseconds 500
+            Show "start"; Shot "frame-normal"
+            $q = Rect; $W = $q.Rt - $q.L
+            # move: drag the empty part of the tab strip
+            [U]::Drag([int]($q.L + $W * 0.62), $q.T + 18, 80, 40); Start-Sleep -Milliseconds 600; Show "after drag-move (+80,+40)"
+            # maximize / restore with the strip buttons (46px each, right edge)
+            $q = Rect; [U]::Click($q.Rt - 69, $q.T + 18); Start-Sleep -Seconds 1; Show "after max click"
+            $wa = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea; Write-Host "work area $($wa.Left),$($wa.Top)-$($wa.Right),$($wa.Bottom)"
+            Shot "frame-maximized"
+            $q = Rect; [U]::Click($q.Rt - 69, $q.T + 18); Start-Sleep -Seconds 1; Show "after restore click"
+            # double-click the strip: maximize, again: restore
+            $q = Rect; [U]::Click([int]($q.L + $W * 0.62), $q.T + 18); [U]::Click([int]($q.L + $W * 0.62), $q.T + 18); Start-Sleep -Seconds 1; Show "after double-click"
+            if ([U]::IsZoomed($hw)) { $q = Rect; [U]::Click($q.Rt - 69, $q.T + 18); Start-Sleep -Seconds 1 }
+            # resize: top edge (strip handles it), right edge (window shadow)
+            $q = Rect; [U]::Drag([int]($q.L + $W / 3), $q.T + 2, 0, -50); Start-Sleep -Milliseconds 600; Show "after top-edge drag -50"
+            $q = Rect; [U]::Drag($q.Rt + 3, [int](($q.T + $q.B) / 2), 70, 0); Start-Sleep -Milliseconds 600; Show "after right-edge drag +70 (outside)"
+            $q = Rect; [U]::Drag($q.Rt - 2, [int](($q.T + $q.B) / 2), 70, 0); Start-Sleep -Milliseconds 600; Show "after right-edge drag +70 (inside)"
+            # minimize, then bring back
+            $q = Rect; [U]::Click($q.Rt - 115, $q.T + 18); Start-Sleep -Seconds 1; Show "after min click"
+            [U]::ShowWindow($hw, 9) | Out-Null; Start-Sleep -Seconds 1; Show "after restore from min"
+            $p.Refresh(); if (-not $p.Responding) { $hung++; Write-Host "NOT RESPONDING after frame tests" }
             $b = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
             $bmp = New-Object System.Drawing.Bitmap $b.Width, $b.Height
             $g = [System.Drawing.Graphics]::FromImage($bmp); $g.CopyFromScreen($b.Location, [System.Drawing.Point]::Empty, $b.Size)
@@ -137,7 +166,7 @@ jobs:
         if: always()
         with:
           name: kite-windows-screen
-          path: ${{ runner.temp }}/screen.png
+          path: ${{ runner.temp }}/*.png
       - name: Fail when the UI hung, stalled after startup, or events stormed
         if: always()
         shell: pwsh

@@ -113,3 +113,16 @@ body { height: auto; background: var(--bg-toolbar); }
 @keyframes dl-bob { 50% { transform: translateY(1.5px); } }
 .tb.dl.finished { animation: dl-done .9s ease; }
 @keyframes dl-done { 0% { box-shadow: 0 0 0 0 var(--accent-soft); background: var(--accent-soft); color: var(--accent); } 100% { box-shadow: 0 0 0 10px transparent; } }
+
+/* ---- Windows: no title bar — window buttons and the top resize edge live in the tab strip ---- */
+.winctl, .resize-top { display: none; }
+:root[data-platform="windows"] .strip { position: relative; padding-right: 0; }
+:root[data-platform="windows"] .winctl { display: flex; align-self: stretch; margin-left: 4px; flex: none; }
+:root[data-platform="windows"] .resize-top { display: block; position: absolute; left: 0; right: 138px; top: 0; height: 4px; cursor: n-resize; z-index: 5; }
+:root[data-platform="windows"].maximized .resize-top { display: none; }
+.wc { width: 46px; height: 100%; display: grid; place-items: center; color: var(--text); border-radius: 0; transition: background .1s; }
+.wc svg { width: 10px; height: 10px; fill: none; stroke: currentColor; stroke-width: 1; shape-rendering: crispEdges; }
+.wc:hover { background: var(--bg-hover); }
+.wc:active { background: var(--bg-press); }
+.wc.close:hover { background: #c42b1c; color: #fff; }
+.wc.close:active { background: #c42b1c99; color: #fff; }

@@ -2,6 +2,7 @@
 // and sends commands.
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 // Only events sent to this webview (a plain `listen` also gets those for other windows).
 const wv = getCurrentWebview();
 const listen: typeof wv.listen = (...a) => wv.listen(...a);
@@ -23,6 +24,12 @@ document.body.innerHTML = `
     <div class="tabs" id="tabs"></div>
     <button class="strip-btn" id="new-tab" title="새 탭">${icons.plus}</button>
     <div class="strip-fill" data-tauri-drag-region></div>
+    <div class="winctl" id="winctl">
+      <button class="wc" id="wc-min" title="최소화"><svg viewBox="0 0 10 10"><path d="M0 5h10"/></svg></button>
+      <button class="wc" id="wc-max" title="최대화"><svg viewBox="0 0 10 10"><rect x=".5" y=".5" width="9" height="9"/></svg></button>
+      <button class="wc close" id="wc-close" title="닫기"><svg viewBox="0 0 10 10"><path d="M0 0l10 10M10 0 0 10"/></svg></button>
+    </div>
+    <div class="resize-top" id="resize-top"></div>
   </div>
   <div class="toolbar">
     <button class="tb" id="side" title="세로 탭 목록 (탭이 많을 때 · 검색)">${icons.sidebar}</button>
@@ -325,6 +332,34 @@ function renderDownloads(d: DownloadsSnapshot) {
     ? `다운로드 중 ${cur.length}개 · ${cur.map((x) => `${x.name} ${x.total > 0 ? `${Math.floor((x.received / x.total) * 100)}%` : size(x.received)}`).join(", ")}`
     : "다운로드 기록 보기";
 }
+// Windows: the window has no title bar, so the tab strip carries minimize/maximize/close, a
+// drag area (data-tauri-drag-region: drag, double-click to maximize, snap) and the top resize
+// edge (the window shadow is the resize border on the other sides).
+function setupWindowControls() {
+  const win = getCurrentWindow();
+  const maxIcon = (max: boolean) =>
+    max
+      ? `<svg viewBox="0 0 10 10"><rect x=".5" y="2.5" width="7" height="7"/><path d="M2.5 2.5V.5h7v7h-2"/></svg>`
+      : `<svg viewBox="0 0 10 10"><rect x=".5" y=".5" width="9" height="9"/></svg>`;
+  const sync = async () => {
+    const max = await win.isMaximized().catch(() => false);
+    $("#wc-max").innerHTML = maxIcon(max);
+    $("#wc-max").title = max ? "이전 크기로" : "최대화";
+    document.documentElement.classList.toggle("maximized", max);
+  };
+  $("#wc-min").onclick = () => win.minimize();
+  $("#wc-max").onclick = () => win.toggleMaximize();
+  $("#wc-close").onclick = () => win.close();
+  $("#resize-top").addEventListener("mousedown", (e) => {
+    if (e.button !== 0 || document.documentElement.classList.contains("maximized")) return;
+    const w = (e.currentTarget as HTMLElement).clientWidth;
+    const dir = e.clientX < 10 ? "NorthWest" : e.clientX > w - 10 ? "NorthEast" : "North";
+    win.startResizeDragging(dir).catch(() => {});
+  });
+  win.onResized(() => sync());
+  sync();
+}
+
 $("#dl").onclick = () => invoke("downloads_page").catch((err) => toast(String(err)));
 $("#home").onclick = () => invoke("shortcut", { action: "open_home" }).catch((err) => toast(String(err)));
 $("#settings").onclick = () => invoke("shortcut", { action: "open_settings" }).catch((err) => toast(String(err)));
@@ -590,6 +625,7 @@ async function main() {
   const init = await invoke<Init>("ui_init");
   keymap = init.keymap;
   document.documentElement.dataset.platform = init.platform;
+  if (init.platform === "windows") setupWindowControls();
   state = init.state;
   render();
   renderBar(init.bookmarkBar);
