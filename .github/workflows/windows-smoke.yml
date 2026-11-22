@@ -93,6 +93,7 @@ jobs:
             [DllImport("user32.dll")] public static extern bool IsZoomed(IntPtr h);
             [DllImport("user32.dll")] public static extern bool IsIconic(IntPtr h);
             [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int c);
+            [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr h, IntPtr a, int x, int y, int w, int hh, uint f);
             public static void Drag(int x, int y, int dx, int dy) { SetCursorPos(x, y); mouse_event(2, 0, 0, 0, IntPtr.Zero); System.Threading.Thread.Sleep(120); for (int i = 1; i <= 10; i++) { SetCursorPos(x + dx * i / 10, y + dy * i / 10); System.Threading.Thread.Sleep(30); } System.Threading.Thread.Sleep(120); mouse_event(4, 0, 0, 0, IntPtr.Zero); }
             public static void Click(int x, int y) { SetCursorPos(x, y); mouse_event(2, 0, 0, 0, IntPtr.Zero); mouse_event(4, 0, 0, 0, IntPtr.Zero); }
           }
@@ -139,10 +140,14 @@ jobs:
             # double-click the strip: maximize, again: restore
             $q = Rect; [U]::Click([int]($q.L + $W * 0.62), $q.T + 18); [U]::Click([int]($q.L + $W * 0.62), $q.T + 18); Start-Sleep -Seconds 1; Show "after double-click"
             if ([U]::IsZoomed($hw)) { $q = Rect; [U]::Click($q.Rt - 69, $q.T + 18); Start-Sleep -Seconds 1 }
-            # resize: top edge (strip handles it), right edge (window shadow)
-            $q = Rect; [U]::Drag([int]($q.L + $W / 3), $q.T + 2, 0, -50); Start-Sleep -Milliseconds 600; Show "after top-edge drag -50"
-            $q = Rect; [U]::Drag($q.Rt + 3, [int](($q.T + $q.B) / 2), 70, 0); Start-Sleep -Milliseconds 600; Show "after right-edge drag +70 (outside)"
-            $q = Rect; [U]::Drag($q.Rt - 2, [int](($q.T + $q.B) / 2), 70, 0); Start-Sleep -Milliseconds 600; Show "after right-edge drag +70 (inside)"
+            # resize: first a window that fits the runner's small screen, then each edge
+            [U]::SetWindowPos($hw, [IntPtr]::Zero, 100, 80, 800, 520, 4) | Out-Null; Start-Sleep -Milliseconds 800; Show "set 800x520 at 100,80"
+            $q = Rect; [U]::Drag([int]($q.L + 300), $q.T + 2, 0, -40); Start-Sleep -Milliseconds 700; Show "after top-edge drag -40 (expect taller)"
+            $q = Rect; [U]::Drag($q.Rt + 3, [int](($q.T + $q.B) / 2), 60, 0); Start-Sleep -Milliseconds 700; Show "after right-edge drag +60 just outside (expect wider)"
+            $q = Rect; [U]::Drag($q.Rt - 2, [int](($q.T + $q.B) / 2), 40, 0); Start-Sleep -Milliseconds 700; Show "after right-edge drag +40 just inside"
+            $q = Rect; [U]::Drag([int](($q.L + $q.Rt) / 2), $q.B + 3, 0, 50); Start-Sleep -Milliseconds 700; Show "after bottom-edge drag +50 just outside (expect taller)"
+            $q = Rect; [U]::Drag($q.L - 3, [int](($q.T + $q.B) / 2), -40, 0); Start-Sleep -Milliseconds 700; Show "after left-edge drag -40 just outside (expect wider)"
+            Shot "frame-resized"
             # minimize, then bring back
             $q = Rect; [U]::Click($q.Rt - 115, $q.T + 18); Start-Sleep -Seconds 1; Show "after min click"
             [U]::ShowWindow($hw, 9) | Out-Null; Start-Sleep -Seconds 1; Show "after restore from min"
