@@ -8,8 +8,35 @@
   if (window.__kite) return;
   var KEYS = __KITE_KEYMAP__;
   var lastCombo = "";
+  // A popup window (window.open with a size) on macOS shares its opener tab's WebKit setup, so
+  // this script and the tab's IPC come along: anything it sent would act on the opener tab
+  // (⌘W would close it, a login would be saved for the tab's site). So in a popup: no messages
+  // at all, and window.close() / ⌘W close the popup through a URL Kite catches.
+  var popup = false;
+  try {
+    popup = window.top === window && !!window.opener;
+  } catch (e) {}
+  if (popup) {
+    var closePopup = function () {
+      location.href = "kite-popup-close:" + Date.now();
+    };
+    try {
+      window.close = closePopup;
+    } catch (e) {}
+    window.addEventListener(
+      "keydown",
+      function (e) {
+        if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.code === "KeyW") {
+          e.preventDefault();
+          closePopup();
+        }
+      },
+      true
+    );
+  }
   // Looked up at send time: our init script may run before Tauri's IPC script.
   function send(kind, action) {
+    if (popup) return;
     var t = window.__TAURI_INTERNALS__;
     if (t && typeof t.invoke === "function") {
       try {
@@ -45,6 +72,31 @@
       send("shortcut", a);
     },
     true
+  );
+
+  // ---------- Ctrl + wheel = page zoom (like Chrome) ----------
+  // WebView2's own Ctrl+wheel zoom is off (zoom hotkeys disabled) and WKWebView has none: the
+  // app zooms the tab (same steps as Ctrl +/-). A page that handles Ctrl+wheel itself (maps,
+  // editors) and cancels it keeps it, as in Chrome. Trackpads send many small deltas: they add
+  // up to one step, and steps are spaced out.
+  var wheelSum = 0;
+  var wheelAt = 0;
+  var stepAt = 0;
+  window.addEventListener(
+    "wheel",
+    function (e) {
+      if (!e.ctrlKey || !e.isTrusted || e.defaultPrevented || !e.deltaY) return;
+      e.preventDefault();
+      var now = Date.now();
+      if (now - wheelAt > 300) wheelSum = 0;
+      wheelAt = now;
+      wheelSum += e.deltaMode === 1 ? e.deltaY * 40 : e.deltaMode === 2 ? e.deltaY * 400 : e.deltaY;
+      if (Math.abs(wheelSum) < 30 || now - stepAt < 70) return;
+      send("shortcut", wheelSum < 0 ? "zoom_in" : "zoom_out");
+      wheelSum = 0;
+      stepAt = now;
+    },
+    { passive: false }
   );
 
   // ---------- SPA url changes (the app reads the real URL from the webview) ----------
@@ -906,6 +958,105 @@
         function (e) { results[id] = JSON.stringify({ ok: false, error: String((e && e.message) || e) }); }
       );
   };
+
+  // ---------- passwords ----------
+  // A password field on the page: tell the app (it may fill a saved login through
+  // `kite.fillLogin`). A login sent: give the app what was typed; it reads the site from the
+  // webview itself and asks the user before saving anything.
+  if (/^https?:$/.test(location.protocol)) {
+    var visible = function (el) {
+      if (el.disabled || el.readOnly) return false;
+      var r = el.getBoundingClientRect();
+      if (r.width < 2 || r.height < 2) return false;
+      var cs = getComputedStyle(el);
+      return cs.visibility !== "hidden" && cs.display !== "none";
+    };
+    var pwFields = function (root) {
+      return Array.prototype.filter.call((root || document).querySelectorAll('input[type="password"]'), visible);
+    };
+    // The username field: autocomplete=username, else the last text-like input before the password.
+    var userFieldFor = function (pw) {
+      var scope = pw.form || document;
+      var tagged = scope.querySelector('input[autocomplete~="username"]');
+      if (tagged && visible(tagged)) return tagged;
+      var inputs = scope.querySelectorAll("input");
+      var found = null;
+      for (var i = 0; i < inputs.length; i++) {
+        var el = inputs[i];
+        if (el === pw) break;
+        var t = (el.type || "text").toLowerCase();
+        if ((t === "text" || t === "email" || t === "tel") && visible(el)) found = el;
+      }
+      return found;
+    };
+    // Through the native setter + input/change events, so React/Vue see the value.
+    var setValue = function (el, v) {
+      var proto = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value");
+      el.focus();
+      if (proto && proto.set) proto.set.call(el, v);
+      else el.value = v;
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+      el.dispatchEvent(new Event("change", { bubbles: true }));
+      el.blur();
+    };
+    var announced = [];
+    var announce = function () {
+      var fresh = pwFields().filter(function (f) { return announced.indexOf(f) < 0 && f.autocomplete !== "new-password"; });
+      if (!fresh.length || announced.length > 20) return;
+      announced = announced.concat(fresh);
+      send("password", "form:" + location.origin);
+    };
+    var lastSent = "";
+    var capture = function (root) {
+      var pws = pwFields(root).filter(function (f) { return f.value; });
+      if (!pws.length && root !== document) pws = pwFields(document).filter(function (f) { return f.value; });
+      // Change-password forms (3 fields) are skipped; sign-up forms repeat one value.
+      if (!pws.length || pws.length > 2 || (pws.length === 2 && pws[0].value !== pws[1].value)) return;
+      var pw = pws[0];
+      var uf = userFieldFor(pw);
+      var key = (uf ? uf.value : "") + "\u0000" + pw.value;
+      if (key === lastSent) return;
+      lastSent = key;
+      send("password", JSON.stringify({ o: location.origin, u: uf ? uf.value : "", p: pw.value }));
+    };
+    document.addEventListener("submit", function (e) { capture(e.target); }, true);
+    // Many sites log in with a button and fetch(), without a real submit.
+    document.addEventListener(
+      "click",
+      function (e) {
+        var btn = e.target && e.target.closest && e.target.closest('button, input[type="submit"], input[type="button"], [role="button"]');
+        if (btn) capture(btn.form || btn.closest("form") || document);
+      },
+      true
+    );
+    document.addEventListener(
+      "keydown",
+      function (e) {
+        if (e.key === "Enter" && e.target && e.target.tagName === "INPUT") capture(e.target.form || document);
+      },
+      true
+    );
+    kite.fillLogin = function (origin, user, pass) {
+      if (location.origin !== origin) return false;
+      var pw = pwFields().filter(function (f) { return f.autocomplete !== "new-password"; })[0];
+      if (!pw) return false;
+      var uf = userFieldFor(pw);
+      if (uf && user && !uf.value) setValue(uf, user);
+      if (!pw.value) setValue(pw, pass);
+      lastSent = (uf ? uf.value : "") + "\u0000" + pw.value;
+      return true;
+    };
+    var timer = 0;
+    var schedule = function () {
+      clearTimeout(timer);
+      timer = setTimeout(announce, 400);
+    };
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", schedule);
+    else schedule();
+    window.addEventListener("load", schedule);
+    new MutationObserver(schedule).observe(document.documentElement, { childList: true, subtree: true });
+  }
+
   kite.take = function (id) {
     if (!(id in results)) return "__missing__";
     var r = results[id];

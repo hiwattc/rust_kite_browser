@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-neterror-proceed"
+description = "Enables the neterror_proceed command without any pre-configured scope."
+commands.allow = ["neterror_proceed"]
+
+[[permission]]
+identifier = "deny-neterror-proceed"
+description = "Denies the neterror_proceed command without any pre-configured scope."
+commands.deny = ["neterror_proceed"]

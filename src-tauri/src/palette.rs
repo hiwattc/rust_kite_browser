@@ -49,9 +49,13 @@ pub struct Command {
 
 pub const COMMANDS: &[Command] = &[
     Command { id: "open_settings", title: "설정", keywords: "settings preferences 환경설정 옵션 kite://settings" },
+    Command { id: "open_home", title: "홈 (개인 포털)", keywords: "home portal start igoogle workspace 홈 포털 시작 워크스페이스 할 일 todo kite://home" },
+    Command { id: "open_meet", title: "영상회의 (1:1, 화면 공유)", keywords: "meet video call conference webrtc p2p 화상 회의 통화 화면 공유 kite://meet" },
     Command { id: "open_bookmarks", title: "북마크 관리자", keywords: "bookmarks manager 즐겨찾기 편집 kite://bookmarks" },
+    Command { id: "toggle_side_tabs", title: "세로 탭 목록 표시/숨기기", keywords: "vertical tabs side panel list 세로 탭 사이드 목록 패널" },
     Command { id: "toggle_bookmark_bar", title: "북마크 바 표시/숨기기", keywords: "bookmark bar toolbar 즐겨찾기 바" },
     Command { id: "new_tab", title: "새 탭", keywords: "new tab" },
+    Command { id: "new_window", title: "새 창", keywords: "new window" },
     Command { id: "close_tab", title: "탭 닫기", keywords: "close tab" },
     Command { id: "reopen_tab", title: "닫은 탭 다시 열기", keywords: "reopen closed tab undo" },
     Command { id: "duplicate_tab", title: "탭 복제", keywords: "duplicate tab" },
@@ -68,6 +72,9 @@ pub const COMMANDS: &[Command] = &[
     Command { id: "devtools", title: "개발자 도구", keywords: "devtools inspector console" },
     Command { id: "import_chrome", title: "크롬 북마크 가져오기", keywords: "import chrome bookmarks 즐겨찾기" },
     Command { id: "clear_history", title: "방문 기록 모두 지우기", keywords: "clear history" },
+    Command { id: "install_extension", title: "확장 프로그램 설치 (지금 보는 크롬 웹 스토어 페이지)", keywords: "extension install chrome web store 확장 설치 add" },
+    Command { id: "open_extensions", title: "확장 프로그램 관리", keywords: "extensions manage 확장 프로그램 chrome://extensions" },
+    Command { id: "open_passwords", title: "비밀번호 관리자", keywords: "passwords password manager 암호 로그인 저장 kite://passwords" },
     Command { id: "mcp_copy", title: "Claude Code 연결 명령 복사 (MCP)", keywords: "mcp claude agent automation 자동화" },
     Command { id: "mcp_toggle", title: "MCP 자동화 서버 켜기/끄기", keywords: "mcp server on off agent" },
 ];
@@ -94,7 +101,7 @@ pub fn as_url(input: &str) -> Option<String> {
         return None;
     }
     let lower = s.to_ascii_lowercase();
-    for scheme in ["http://", "https://", "file://", "about:", "data:", "view-source:"] {
+    for scheme in ["http://", "https://", "file://", "about:", "data:", "view-source:", "chrome-extension://", "webkit-extension://"] {
         if lower.starts_with(scheme) {
             return url::Url::parse(s).ok().map(|u| u.to_string());
         }
@@ -222,6 +229,8 @@ fn search_one(query: &str, tabs: &[TabRef], store: &Store, engine: &str, typed: 
             let name = match p {
                 "settings" => "설정",
                 "bookmarks" => "북마크 관리자",
+                "meet" => "영상회의",
+                "home" => "홈 (개인 포털)",
                 _ => "새 탭",
             };
             items.push(Item { kind: "url".into(), id: format!("kite://{p}"), title: name.into(), subtitle: format!("kite://{p}"), icon: None, hint: None });

@@ -1,8 +1,21 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "chrome",
-  "description": "The browser's own pages: tab strip/toolbar (ui) and the spotlight palette",
-  "webviews": ["ui", "palette"],
+  "description": "The browser's own pages: tab strip/toolbar (ui), the spotlight palette and the address bar suggestions (omni)",
+  "webviews": [
+    "ui",
+    "palette",
+    "omni",
+    "ui-*",
+    "palette-*",
+    "omni-*",
+    "cover",
+    "cover-*",
+    "launcher",
+    "side",
+    "side-*",
+    "siteinfo"
+  ],
   "permissions": [
     "core:default",
     "core:window:allow-start-dragging",
@@ -13,7 +26,14 @@
     "allow-tab-close",
     "allow-tab-activate",
     "allow-tab-move",
+    "allow-tab-drag-start",
+    "allow-tab-drag-move",
+    "allow-tab-drag-drop",
     "allow-navigate",
+    "allow-omni-suggest",
+    "allow-omni-show",
+    "allow-omni-hide",
+    "allow-omni-pick",
     "allow-set-chrome-height",
     "allow-palette-open",
     "allow-palette-close",
@@ -21,6 +41,16 @@
     "allow-palette-search",
     "allow-palette-run",
     "allow-toggle-bookmark",
-    "allow-mcp-info"
+    "allow-mcp-info",
+    "allow-ext-popup",
+    "allow-theme-get",
+    "allow-side-resize",
+    "allow-side-bookmarks",
+    "allow-ui-menu",
+    "allow-site-info-open",
+    "allow-site-info",
+    "allow-site-info-size",
+    "allow-site-info-close",
+    "allow-copy-text"
   ]
 }

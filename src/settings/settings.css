@@ -1,0 +1,29 @@
+/* Theme picker: a small browser drawn in each theme's colors */
+.theme-row { border-bottom: 0; }
+.themes { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 10px; padding: 4px 20px 20px; }
+.theme { display: flex; flex-direction: column; align-items: stretch; gap: 6px; padding: 8px; border-radius: 12px; border: 1.5px solid var(--border); background: var(--bg-panel); text-align: left; transition: border-color .12s, box-shadow .12s, transform .12s; }
+.theme:hover { border-color: var(--border-strong); transform: translateY(-1px); }
+.theme.on { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.tp-split { display: grid; grid-template-columns: 1fr 1fr; border-radius: 7px; overflow: hidden; }
+.tp-split .tp-win { border-radius: 0; }
+.tp-win { display: flex; flex-direction: column; height: 62px; border-radius: 7px; overflow: hidden; background: var(--b); border: 1px solid rgba(128, 128, 128, .22); }
+.tp-strip { display: flex; gap: 3px; align-items: flex-end; height: 14px; padding: 0 6px; background: var(--s); }
+.tp-strip i { width: 22px; height: 9px; border-radius: 3px 3px 0 0; background: color-mix(in srgb, var(--b) 45%, var(--s)); }
+.tp-strip i.on { background: var(--b); }
+.tp-bar { display: flex; align-items: center; gap: 4px; height: 15px; padding: 0 6px; background: var(--b); }
+.tp-addr { flex: 1; height: 7px; border-radius: 4px; background: color-mix(in srgb, var(--t) 12%, var(--b)); }
+.tp-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--a); }
+.tp-body { flex: 1; display: flex; flex-direction: column; gap: 4px; padding: 6px 8px; background: color-mix(in srgb, var(--b) 70%, var(--s)); }
+.tp-line { height: 4px; border-radius: 2px; background: color-mix(in srgb, var(--t) 28%, transparent); }
+.tp-line.short { width: 55%; background: var(--a); opacity: .8; }
+.tp-name { display: flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; padding: 0 2px; }
+.tp-check { margin-left: auto; color: var(--accent); }
+.tp-sub { font-size: 11px; color: var(--text-faint); padding: 0 2px; margin-top: -4px; }
+
+/* Global shortcut control */
+.shortcut-ctl { display: flex; align-items: center; gap: 10px; flex: none; }
+.kbd-btn { height: 30px; padding: 0 10px; }
+.kbd-btn kbd { font-size: 12px; }
+.kbd-btn.recording { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.link-btn { height: 30px; padding: 0 6px; color: var(--text-faint); font-size: 12px; text-decoration: underline; text-underline-offset: 2px; }
+.link-btn:hover { color: var(--accent); }

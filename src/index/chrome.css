@@ -72,3 +72,26 @@ body { height: auto; background: var(--bg-toolbar); }
 .bb-all { border-left: 1px solid var(--border); border-radius: 0 12px 12px 0; padding-left: 10px; }
 .bb-empty { color: var(--text-faint); font-size: 12px; padding: 0 6px; white-space: nowrap; }
 [hidden] { display: none !important; }
+/* tab drag-to-reorder */
+.tabs.dragging .tab { transition: transform .15s ease; }
+.tabs.dragging .tab.lifted { transition: none; z-index: 2; background: var(--bg-tab-active); box-shadow: 0 0 0 1px var(--border); }
+.tabs.dragging .tab::before { display: none; }
+
+/* Extension buttons next to the address bar */
+.exts { display: flex; align-items: center; gap: 2px; flex: none; margin-right: 4px; }
+.exts[hidden] { display: none; }
+.ext { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; flex: none; color: var(--text-dim); }
+.ext:hover { background: var(--bg-hover); }
+.ext:active { background: var(--bg-press); }
+.ext img { width: 18px; height: 18px; object-fit: contain; image-rendering: auto; }
+.ext .icon { width: 16px; height: 16px; }
+
+/* Toolbar button for the page being shown (the settings gear on kite://settings) */
+.tb.on { color: var(--accent); background: var(--accent-soft); }
+.tb#settings .icon { transition: transform .35s ease; }
+.tb#settings:hover .icon { transform: rotate(45deg); }
+
+/* Site info: the icon before the address opens it */
+.omni-icon.clickable { width: 24px; height: 24px; margin-left: -6px; border-radius: 50%; display: grid; place-items: center; cursor: pointer; }
+.omni-icon.clickable:hover { background: var(--bg-hover); color: var(--text); }
+.omni-icon.insecure { color: #d33a3f; }

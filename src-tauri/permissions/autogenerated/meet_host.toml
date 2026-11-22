@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-meet-host"
+description = "Enables the meet_host command without any pre-configured scope."
+commands.allow = ["meet_host"]
+
+[[permission]]
+identifier = "deny-meet-host"
+description = "Denies the meet_host command without any pre-configured scope."
+commands.deny = ["meet_host"]

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-neterror-retry"
+description = "Enables the neterror_retry command without any pre-configured scope."
+commands.allow = ["neterror_retry"]
+
+[[permission]]
+identifier = "deny-neterror-retry"
+description = "Denies the neterror_retry command without any pre-configured scope."
+commands.deny = ["neterror_retry"]

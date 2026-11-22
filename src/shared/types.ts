@@ -7,6 +7,10 @@ export interface Tab {
   zoom: number;
   bookmarked: boolean;
   live: boolean;
+  /** Showing the "cannot reach" page for `url`. */
+  error?: boolean;
+  /** The user chose to continue despite this site's certificate. */
+  badCert?: boolean;
 }
 
 export interface McpStatus {
@@ -20,6 +24,8 @@ export interface BrowserState {
   active: number | null;
   agentTab: number | null;
   mcp: McpStatus;
+  /** The vertical tab list on the left is open. */
+  side: boolean;
 }
 
 export interface BarItem {
@@ -42,6 +48,16 @@ export interface Init {
   bookmarkBar: BarItem[] | null;
   keymap: Record<string, string>;
   platform: "mac" | "windows" | "linux";
+  extensions: ToolbarExt[];
+}
+
+/** An installed extension's toolbar button. */
+export interface ToolbarExt {
+  id: string;
+  name: string;
+  /** `data:` URL */
+  icon: string | null;
+  popup: boolean;
 }
 
 export interface Item {

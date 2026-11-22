@@ -48,6 +48,7 @@ pub fn bindings() -> Vec<Binding> {
     let mut v: Vec<(String, &'static str)> = vec![
         ("Ctrl+Shift+KeyP".to_string(), "palette"),
         (format!("{m}+KeyT"), "new_tab"),
+        (format!("{m}+KeyN"), "new_window"),
         (format!("{m}+KeyW"), "close_tab"),
         (format!("{m}+Shift+KeyT"), "reopen_tab"),
         (format!("{m}+KeyL"), "focus_address"),

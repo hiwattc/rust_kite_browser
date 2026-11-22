@@ -3,74 +3,7 @@ import { esc } from "../shared/page";
 
 // ---------------------------------------------------------------- 시스템 구성도
 
-const pill = (y: number, name: string, what: string) =>
-  `<rect class="d-pill" x="200" y="${y}" width="190" height="22" rx="6"/>` +
-  `<text class="d-mono" x="210" y="${y + 15}">${name}</text><text class="d-dim" x="380" y="${y + 15}" text-anchor="end">${what}</text>`;
-
-const view = (y: number, h: number, name: string, what: string) =>
-  `<rect class="d-box" x="530" y="${y}" width="190" height="${h}" rx="8"/>` +
-  `<text class="d-mono" x="542" y="${y + 18}">${name}</text><text class="d-dim" x="542" y="${y + 34}">${what}</text>`;
-
-const arrow = (y: number, label: string, dir: "both" | "right" | "left") => {
-  const [a, b] = dir === "left" ? [530, 400] : [400, 530];
-  const start = dir === "both" ? ' marker-start="url(#d-head)"' : "";
-  return `<line class="d-line" x1="${a}" y1="${y}" x2="${b}" y2="${y}" marker-end="url(#d-head)"${start}/><text class="d-label" x="465" y="${y - 5}" text-anchor="middle">${label}</text>`;
-};
-
-export const diagram = `
-<svg class="diagram" viewBox="0 0 760 460" role="img" aria-label="Kite 시스템 구성도">
-  <defs><marker id="d-head" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="d-headfill"/></marker></defs>
-
-  <rect class="d-app" x="176" y="16" width="568" height="330" rx="14"/>
-  <text class="d-title" x="192" y="40">Kite 앱 · Tauri v2 (프로세스 하나, 창 하나)</text>
-
-  <rect class="d-box" x="190" y="56" width="210" height="276" rx="10"/>
-  <text class="d-head" x="202" y="76">Rust 코어</text>
-  ${pill(86, "browser.rs", "탭 상태·웹뷰 배치")}
-  ${pill(116, "keymap.rs", "단축키 표")}
-  ${pill(146, "palette.rs", "검색·한영 보정")}
-  ${pill(176, "automation.rs", "탭에서 JS 실행")}
-  ${pill(206, "mcp.rs", "MCP 서버·도구")}
-  ${pill(236, "pages.rs", "내부 페이지 명령")}
-  ${pill(266, "store.rs", "SQLite 저장소")}
-  ${pill(296, "platform.rs", "스크린샷·OS 차이")}
-
-  <text class="d-head" x="530" y="76">웹뷰 (OS 웹 엔진)</text>
-  ${view(86, 40, "ui", "탭줄 · 툴바 · 북마크 바")}
-  ${view(136, 40, "palette", "스포트라이트 오버레이")}
-  <rect class="d-box d-stack" x="536" y="192" width="190" height="56" rx="8"/>
-  ${view(186, 56, "tab-N", "웹 페이지 + content.js")}
-  ${view(256, 60, "kite://", "새 탭 · 설정 · 북마크")}
-
-  ${arrow(106, "invoke · 이벤트", "both")}
-  ${arrow(156, "invoke · 이벤트", "both")}
-  ${arrow(204, "JS 실행", "right")}
-  ${arrow(230, "content_event", "left")}
-  ${arrow(286, "invoke (로컬만)", "both")}
-
-  <rect class="d-ext" x="16" y="186" width="140" height="58" rx="10"/>
-  <text class="d-head" x="86" y="210" text-anchor="middle">AI 에이전트</text>
-  <text class="d-dim" x="86" y="228" text-anchor="middle">Claude Code 등</text>
-  <line class="d-line" x1="156" y1="217" x2="200" y2="217" marker-end="url(#d-head)"/>
-  <text class="d-label" x="86" y="262" text-anchor="middle">HTTP · 127.0.0.1</text>
-  <text class="d-label" x="86" y="276" text-anchor="middle">Bearer 토큰</text>
-
-  <rect class="d-os" x="16" y="364" width="728" height="84" rx="12"/>
-  <text class="d-title" x="30" y="438">운영체제 (macOS · Windows)</text>
-  <rect class="d-box" x="30" y="378" width="140" height="38" rx="8"/>
-  <text class="d-dim" x="100" y="401" text-anchor="middle">외부 앱 · f5-epi: 등</text>
-  <rect class="d-box" x="190" y="378" width="210" height="38" rx="8"/>
-  <text class="d-dim" x="295" y="401" text-anchor="middle">kite.db (SQLite) · mcp-token</text>
-  <rect class="d-box" x="530" y="378" width="190" height="38" rx="8"/>
-  <text class="d-dim" x="625" y="401" text-anchor="middle">WKWebView · WebView2</text>
-
-  <line class="d-line" x1="295" y1="332" x2="295" y2="378" marker-end="url(#d-head)"/>
-  <text class="d-label" x="301" y="356">읽기·쓰기</text>
-  <path class="d-line" d="M190 320 H100 V378" fill="none" marker-end="url(#d-head)"/>
-  <text class="d-label" x="106" y="356">확인 후 열기</text>
-  <line class="d-line d-dash" x1="625" y1="332" x2="625" y2="378"/>
-  <text class="d-label" x="631" y="356">렌더링</text>
-</svg>`;
+export { diagram } from "./diagram";
 
 // ---------------------------------------------------------------- 구현 아키텍처
 
@@ -102,6 +35,14 @@ const ARCH: [string, string][] = [
   [
     "권한 경계",
     "웹 페이지(탭)가 부를 수 있는 앱 명령은 <code>content_event</code> 하나뿐입니다. 설정·북마크 같은 내부 페이지 명령은 로컬 페이지에만 열려 있고, 앱 UI 명령은 탭에 열지 않습니다. 페이지가 보낸 값은 믿지 않고 주소는 웹뷰에서 다시 읽습니다. 웹 페이지가 외부 앱 링크(<code>f5-epi:</code> 등)를 열면 확인창을 거쳐 OS에 넘깁니다.",
+  ],
+  [
+    "확장 프로그램",
+    "크롬 웹 스토어의 CRX를 받아 압축을 풀어 <code>extensions/&lt;ID&gt;</code>에 두고(<code>extensions.rs</code>), OS 엔진에 올립니다. macOS는 탭마다 <code>WKWebViewConfiguration</code>에 WebKit의 <code>WKWebExtensionController</code>를 붙이고, Windows는 WebView2의 <code>AddBrowserExtension</code>을 씁니다. WebKit은 확장을 올린 뒤 만든 탭에 차단 규칙(declarativeNetRequest)을 주지 않아서, 새 탭이 생기면 차단 규칙이 있는 확장을 다시 올립니다.",
+  ],
+  [
+    "비밀번호 관리자",
+    "로그인 폼 제출을 <code>content.js</code>가 알리면, Rust가 사이트 주소를 웹뷰에서 다시 읽어 페이지가 말한 주소와 같을 때만 저장을 묻습니다. 비밀번호는 AES-256-GCM으로 암호화해 <code>kite.db</code>에 두고, 키는 OS 키체인(Windows 자격 증명 관리자)에만 있습니다. 자동 입력은 Rust가 탭에 스크립트를 실행해 하며, 페이지 안에서도 출처가 같은지 한 번 더 확인합니다(<code>passwords.rs</code>).",
   ],
   [
     "데이터 저장",
@@ -149,10 +90,13 @@ const OSS: [string, Oss[]][] = [
     [
       ["SQLite", "3.54", "Public Domain", "로컬 데이터베이스 (앱에 포함)", "https://sqlite.org"],
       ["rusqlite", "0.42", "MIT", "SQLite 연결", "https://github.com/rusqlite/rusqlite"],
-      ["ring", "0.17", "Apache-2.0 / ISC", "MCP 토큰 난수", "https://github.com/briansmith/ring"],
+      ["ring", "0.17", "Apache-2.0 / ISC", "MCP 토큰 난수, 비밀번호 암호화(AES-256-GCM)", "https://github.com/briansmith/ring"],
+      ["keyring", "3.6", "MIT / Apache-2.0", "비밀번호 키를 OS 키체인에 보관", "https://github.com/open-source-cooperative/keyring-rs"],
       ["serde · serde_json", "1.0", "MIT / Apache-2.0", "직렬화", "https://github.com/serde-rs/serde"],
       ["base64", "0.22", "MIT / Apache-2.0", "인코딩", "https://github.com/marshallpierce/rust-base64"],
       ["dirs", "6.0", "MIT / Apache-2.0", "다운로드·데이터 폴더 찾기", "https://github.com/soc/dirs-rs"],
+      ["ureq", "3.5", "MIT / Apache-2.0", "웹 스토어에서 확장 프로그램 받기", "https://github.com/algesten/ureq"],
+      ["zip", "9.8", "MIT", "확장 프로그램(CRX) 압축 풀기", "https://github.com/zip-rs/zip2"],
     ],
   ],
   [

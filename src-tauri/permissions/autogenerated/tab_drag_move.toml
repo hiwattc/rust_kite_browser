@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-tab-drag-move"
+description = "Enables the tab_drag_move command without any pre-configured scope."
+commands.allow = ["tab_drag_move"]
+
+[[permission]]
+identifier = "deny-tab-drag-move"
+description = "Denies the tab_drag_move command without any pre-configured scope."
+commands.deny = ["tab_drag_move"]

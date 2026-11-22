@@ -1,3 +1,40 @@
+/* Resizable folder tree (--side-w set from main.ts): the page grows with it instead of squeezing the list. */
+.page.split { grid-template-columns: var(--side-w, 220px) 8px minmax(0, 1fr); max-width: calc(852px + var(--side-w, 220px)); }
+.page.split .side { min-width: 0; }
+.page.split .nav > span:not(.count) { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.splitter { position: sticky; top: 0; height: 100vh; align-self: start; cursor: col-resize; touch-action: none; }
+.splitter::after { content: ""; position: absolute; top: 28px; bottom: 28px; left: 3px; width: 2px; border-radius: 1px; background: var(--border); transition: background .12s; }
+.splitter:hover::after, body.resizing .splitter::after { background: var(--accent); }
+body.resizing { cursor: col-resize; user-select: none; -webkit-user-select: none; }
+/* Window-high page: the tree and the list scroll on their own (the title and the search bar stay). */
+body.page-bookmarks { height: 100vh; overflow: hidden; }
+.page.split { height: 100vh; min-height: 0; }
+.page.split .side { position: static; align-self: stretch; height: 100vh; box-sizing: border-box; padding-top: 0; overflow-y: auto; overscroll-behavior: contain; }
+.page.split .side-head { position: sticky; top: 0; z-index: 1; padding: 28px 0 10px; margin-bottom: 4px; background: var(--bg-toolbar); }
+.page.split .side h1 { margin: 0 10px 14px; }
+.tree-tools { display: flex; align-items: center; gap: 2px; }
+.tree-tools .tool { width: 28px; height: 28px; flex: none; border-radius: 50%; display: grid; place-items: center; color: var(--text-faint); }
+.tree-tools .tool:hover { background: var(--bg-hover); color: var(--text); }
+.tree-tools .tool .icon { width: 15px; height: 15px; }
+.nav .tw, .nav .tw-gap { width: 16px; height: 16px; flex: none; display: grid; place-items: center; margin-right: -6px; }
+.nav .tw { border-radius: 4px; color: var(--text-faint); }
+.nav .tw:hover { background: var(--bg-press); color: var(--text); }
+.nav .tw .icon { width: 12px; height: 12px; transition: transform .12s; }
+.nav .tw.open .icon { transform: rotate(90deg); }
+.side-head input { flex: 1; min-width: 0; width: 100%; box-sizing: border-box; height: 30px; border-radius: 15px; padding: 0 12px; font-size: 12.5px; }
+.tree { display: flex; flex-direction: column; gap: 2px; }
+.nav.ctx { opacity: .55; }
+.nav mark { background: var(--mark); color: inherit; border-radius: 2px; }
+.tree-empty { padding: 14px 12px; color: var(--text-faint); font-size: 12px; }
+.page.split .side .nav { flex: none; }
+.page.split main { height: 100vh; box-sizing: border-box; overflow-y: auto; overscroll-behavior: contain; padding-top: 0; }
+.page.split main .bar { position: sticky; top: 0; z-index: 2; margin: 0 0 4px; padding: 28px 0 12px; background: var(--bg-toolbar); }
+@media (max-width: 720px) {
+  .page.split { grid-template-columns: 1fr; max-width: none; height: auto; }
+  .splitter { display: none; }
+  body.page-bookmarks { height: auto; overflow: auto; }
+  .page.split .side, .page.split main { height: auto; overflow: visible; }
+}
 .bar { display: flex; gap: 8px; margin-bottom: 16px; }
 .bar input { flex: 1; height: 36px; border-radius: 18px; padding: 0 16px; }
 .card > h2 .sub { font-weight: 400; color: var(--text-faint); font-size: 12px; margin-left: 6px; }
@@ -18,3 +55,44 @@
 .ib:hover { background: var(--bg-press); color: var(--text); }
 .ib[data-act="del"]:hover { color: #d03b3b; }
 .hint { color: var(--text-faint); font-size: 12px; line-height: 1.7; }
+
+/* Dragging a bookmark onto a folder */
+.bm { touch-action: none; }
+.bm.drag-src { opacity: .4; }
+body.dragging-bm, body.dragging-bm * { cursor: grabbing !important; user-select: none; -webkit-user-select: none; }
+.nav.drop { background: var(--accent-soft); color: var(--accent); box-shadow: inset 0 0 0 1.5px var(--accent); opacity: 1; }
+.drag-ghost { position: fixed; left: 0; top: 0; z-index: 100; pointer-events: none; display: flex; align-items: center; gap: 8px; max-width: 280px; padding: 6px 12px; border-radius: 8px; background: var(--bg-panel); border: 1px solid var(--border-strong); box-shadow: 0 6px 20px rgba(0, 0, 0, .25); font-size: 12.5px; white-space: nowrap; }
+.drag-ghost span { overflow: hidden; text-overflow: ellipsis; }
+.drag-ghost .icon { width: 14px; height: 14px; flex: none; color: var(--text-faint); }
+.nav.drag-src { opacity: .4; }
+.nav.drop-before { box-shadow: inset 0 2px 0 var(--accent); border-radius: 0; opacity: 1; }
+.nav.drop-after { box-shadow: inset 0 -2px 0 var(--accent); border-radius: 0; opacity: 1; }
+
+/* Category rows in the list (one per folder) */
+.card.bm-card { overflow: visible; }
+.card.bm-card > :last-child { border-bottom-left-radius: 12px; border-bottom-right-radius: 12px; }
+.cat { position: sticky; top: var(--bar-h, 76px); z-index: 1; display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 14px 0 20px; border-top: 1px solid var(--border); background: color-mix(in srgb, var(--bg-panel) 90%, var(--accent)); color: var(--text-dim); font-size: 12px; cursor: pointer; }
+.cat::before { content: ""; position: absolute; left: 0; top: 8px; bottom: 8px; width: 3px; border-radius: 0 3px 3px 0; background: var(--accent); opacity: .75; }
+.cat:hover { background: color-mix(in srgb, var(--bg-panel) 84%, var(--accent)); }
+.cat-ic { width: 16px; height: 16px; display: grid; place-items: center; color: var(--accent); flex: none; }
+.cat-ic .icon { width: 14px; height: 14px; }
+.cat-path { flex: 1; min-width: 0; display: flex; align-items: center; gap: 5px; overflow: hidden; white-space: nowrap; }
+.cat-path b { font-weight: 650; color: var(--text); overflow: hidden; text-overflow: ellipsis; }
+.cat-parent { color: var(--text-faint); flex: none; max-width: 140px; overflow: hidden; text-overflow: ellipsis; }
+.cat-sep { color: var(--text-faint); opacity: .6; flex: none; }
+.cat-count { flex: none; min-width: 20px; padding: 1px 8px; border-radius: 10px; background: var(--accent-soft); color: var(--accent); font-size: 11px; font-weight: 600; text-align: center; }
+.cat-go { width: 16px; height: 16px; display: grid; place-items: center; color: var(--text-faint); opacity: 0; transition: opacity .12s; flex: none; }
+.cat-go .icon { width: 13px; height: 13px; }
+.cat:hover .cat-go { opacity: 1; }
+.cat + .bm { border-top-color: transparent; }
+
+/* Folder row actions (rename / delete), shown on hover in place of the count */
+.nav-act { display: none; align-items: center; gap: 2px; margin-left: auto; flex: none; }
+.nav-act button { width: 22px; height: 22px; border-radius: 6px; display: grid; place-items: center; color: var(--text-faint); }
+.nav-act button:hover { background: var(--bg-press); color: var(--text); }
+.nav-act button[data-act="fdel"]:hover { color: #d03b3b; }
+.nav-act .icon { width: 13px; height: 13px; }
+body:not(.dragging-bm) .tree .nav:hover .nav-act { display: flex; }
+body:not(.dragging-bm) .tree .nav:hover .count:has(+ .nav-act) { display: none; }
+#ask-label[hidden], .ask-msg[hidden] { display: none; }
+.ask-msg { margin: 0; color: var(--text-dim); font-size: 12.5px; line-height: 1.6; }

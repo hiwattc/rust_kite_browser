@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-portal-import"
+description = "Enables the portal_import command without any pre-configured scope."
+commands.allow = ["portal_import"]
+
+[[permission]]
+identifier = "deny-portal-import"
+description = "Denies the portal_import command without any pre-configured scope."
+commands.deny = ["portal_import"]

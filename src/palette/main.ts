@@ -1,11 +1,17 @@
 // Spotlight palette: its own webview, shown above the tabs. Search runs in Rust
 // (`palette_search`); this renders groups, handles keys and resizes the webview to fit.
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
+// Only events sent to this webview (a plain `listen` also gets those for other windows).
+const wv = getCurrentWebview();
+const listen: typeof wv.listen = (...a) => wv.listen(...a);
 import { combo } from "../shared/keys";
 import { icons } from "../shared/icons";
 import type { Group, Init, Item } from "../shared/types";
 import "./palette.css";
+import { initTheme } from "../shared/theme";
+
+initTheme();
 
 const isMac = navigator.platform.toLowerCase().includes("mac");
 const mod = isMac ? "⌘" : "Ctrl+";
@@ -191,6 +197,8 @@ window.addEventListener("blur", () => {
 });
 
 let openedWithQuery = false;
+/** In the floating launcher window (global shortcut) rather than over a Kite window. */
+const LAUNCHER = new URLSearchParams(location.search).has("launcher");
 async function main() {
   await listen<{ mode: string; query: string }>("palette-open", (e) => {
     openedAt = Date.now();
@@ -203,5 +211,12 @@ async function main() {
   const init = await invoke<Init>("ui_init");
   keymap = init.keymap;
   document.documentElement.dataset.platform = init.platform;
+  // The global launcher window (launcher.rs) may be shown before this page listens: start ready.
+  if (LAUNCHER) {
+    document.body.classList.add("launcher");
+    openedAt = Date.now();
+    q.focus();
+    search();
+  }
 }
 main();

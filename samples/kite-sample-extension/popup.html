@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <header><img src="icons/icon32.png" alt="" /><div><b>Kite 샘플 확장</b><small>v1.0.0 · 팝업</small></div></header>
+  <section>
+    <p class="label">저장된 카운트 <span class="hint">(storage.local, 다시 열어도 유지)</span></p>
+    <div class="count"><span id="n">–</span><button id="inc">+1</button><button id="reset" class="ghost">초기화</button></div>
+  </section>
+  <section class="checks">
+    <p class="label">동작 확인</p>
+    <ul>
+      <li id="c-api">확장 API</li>
+      <li id="c-storage">저장소</li>
+      <li class="info">콘텐츠 스크립트: <a href="https://example.com/" target="_blank">example.com</a> 오른쪽 아래 배지</li>
+    </ul>
+  </section>
+  <script src="popup.js"></script>
+</body>
+</html>

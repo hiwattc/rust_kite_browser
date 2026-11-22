@@ -1,59 +1,74 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="760" height="460" viewBox="0 0 760 460" role="img" aria-label="Kite 시스템 구성도"><style>
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="700" viewBox="0 0 900 700" role="img" aria-label="Kite 시스템 구성도"><style>
 text{font-family:-apple-system,"Segoe UI","Apple SD Gothic Neo","Malgun Gothic",sans-serif;font-size:11px;fill:#1c2230}
 .d-title{font-size:12px;font-weight:650;fill:#5d6576}.d-head{font-size:12.5px;font-weight:650}.d-dim{fill:#5d6576}
 .d-label{fill:#8a92a3;font-size:10px}.d-mono{font-family:ui-monospace,"SF Mono",Consolas,monospace;font-weight:600;fill:#6d4aff}
 .d-app{fill:#efebff;stroke:#c4b6ff}.d-box{fill:#fff;stroke:#c9ced8}.d-stack{opacity:.6}.d-pill{fill:#e9ecf1}
 .d-ext{fill:#fff;stroke:#6d4aff;stroke-dasharray:4 3}.d-os{fill:#f0f2f5;stroke:#dde1e8}.d-line{stroke:#8a92a3;stroke-width:1.3}
-.d-dash{stroke-dasharray:4 3}.d-headfill{fill:#8a92a3}</style><rect width="760" height="460" fill="#f6f7f9"/>
+.d-dash{stroke-dasharray:4 3}.d-headfill{fill:#8a92a3}</style><rect width="900" height="700" fill="#f6f7f9"/>
   <defs><marker id="d-head" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="d-headfill"/></marker></defs>
 
-  <rect class="d-app" x="176" y="16" width="568" height="330" rx="14"/>
-  <text class="d-title" x="192" y="40">Kite 앱 · Tauri v2 (프로세스 하나, 창 하나)</text>
+  <rect class="d-app" x="182" y="16" width="702" height="551" rx="14"/>
+  <text class="d-title" x="198" y="40">Kite 앱 · Tauri v2 (프로세스 하나, 창 여러 개)</text>
 
-  <rect class="d-box" x="190" y="56" width="210" height="276" rx="10"/>
+  <rect class="d-box" x="190" y="56" width="330" height="501" rx="10"/>
   <text class="d-head" x="202" y="76">Rust 코어</text>
-  <rect class="d-pill" x="200" y="86" width="190" height="22" rx="6"/><text class="d-mono" x="210" y="101">browser.rs</text><text class="d-dim" x="380" y="101" text-anchor="end">탭 상태·웹뷰 배치</text>
-  <rect class="d-pill" x="200" y="116" width="190" height="22" rx="6"/><text class="d-mono" x="210" y="131">keymap.rs</text><text class="d-dim" x="380" y="131" text-anchor="end">단축키 표</text>
-  <rect class="d-pill" x="200" y="146" width="190" height="22" rx="6"/><text class="d-mono" x="210" y="161">palette.rs</text><text class="d-dim" x="380" y="161" text-anchor="end">검색·한영 보정</text>
-  <rect class="d-pill" x="200" y="176" width="190" height="22" rx="6"/><text class="d-mono" x="210" y="191">automation.rs</text><text class="d-dim" x="380" y="191" text-anchor="end">탭에서 JS 실행</text>
-  <rect class="d-pill" x="200" y="206" width="190" height="22" rx="6"/><text class="d-mono" x="210" y="221">mcp.rs</text><text class="d-dim" x="380" y="221" text-anchor="end">MCP 서버·도구</text>
-  <rect class="d-pill" x="200" y="236" width="190" height="22" rx="6"/><text class="d-mono" x="210" y="251">pages.rs</text><text class="d-dim" x="380" y="251" text-anchor="end">내부 페이지 명령</text>
-  <rect class="d-pill" x="200" y="266" width="190" height="22" rx="6"/><text class="d-mono" x="210" y="281">store.rs</text><text class="d-dim" x="380" y="281" text-anchor="end">SQLite 저장소</text>
-  <rect class="d-pill" x="200" y="296" width="190" height="22" rx="6"/><text class="d-mono" x="210" y="311">platform.rs</text><text class="d-dim" x="380" y="311" text-anchor="end">스크린샷·OS 차이</text>
+  <rect class="d-pill" x="200" y="86" width="310" height="22" rx="6"/><text class="d-mono" x="210" y="101">browser.rs</text><text class="d-dim" x="500" y="101" text-anchor="end">탭·창·웹뷰 배치, 상태</text>
+  <rect class="d-pill" x="200" y="113" width="310" height="22" rx="6"/><text class="d-mono" x="210" y="128">keymap.rs</text><text class="d-dim" x="500" y="128" text-anchor="end">단축키 표</text>
+  <rect class="d-pill" x="200" y="140" width="310" height="22" rx="6"/><text class="d-mono" x="210" y="155">palette.rs · hangul.rs</text><text class="d-dim" x="500" y="155" text-anchor="end">검색·한영 보정</text>
+  <rect class="d-pill" x="200" y="167" width="310" height="22" rx="6"/><text class="d-mono" x="210" y="182">omnibox.rs</text><text class="d-dim" x="500" y="182" text-anchor="end">주소창 자동완성</text>
+  <rect class="d-pill" x="200" y="194" width="310" height="22" rx="6"/><text class="d-mono" x="210" y="209">launcher.rs</text><text class="d-dim" x="500" y="209" text-anchor="end">전역 스포트라이트</text>
+  <rect class="d-pill" x="200" y="221" width="310" height="22" rx="6"/><text class="d-mono" x="210" y="236">automation.rs</text><text class="d-dim" x="500" y="236" text-anchor="end">탭에서 JS 실행</text>
+  <rect class="d-pill" x="200" y="248" width="310" height="22" rx="6"/><text class="d-mono" x="210" y="263">mcp.rs</text><text class="d-dim" x="500" y="263" text-anchor="end">MCP 서버·도구</text>
+  <rect class="d-pill" x="200" y="275" width="310" height="22" rx="6"/><text class="d-mono" x="210" y="290">pages.rs</text><text class="d-dim" x="500" y="290" text-anchor="end">내부 페이지 명령</text>
+  <rect class="d-pill" x="200" y="302" width="310" height="22" rx="6"/><text class="d-mono" x="210" y="317">portal.rs</text><text class="d-dim" x="500" y="317" text-anchor="end">홈(개인 포털)·사이트 아이콘</text>
+  <rect class="d-pill" x="200" y="329" width="310" height="22" rx="6"/><text class="d-mono" x="210" y="344">neterror.rs</text><text class="d-dim" x="500" y="344" text-anchor="end">접속 불가 진단·인증서 예외</text>
+  <rect class="d-pill" x="200" y="356" width="310" height="22" rx="6"/><text class="d-mono" x="210" y="371">siteinfo.rs</text><text class="d-dim" x="500" y="371" text-anchor="end">사이트 인증서 정보</text>
+  <rect class="d-pill" x="200" y="383" width="310" height="22" rx="6"/><text class="d-mono" x="210" y="398">extensions.rs</text><text class="d-dim" x="500" y="398" text-anchor="end">확장 프로그램</text>
+  <rect class="d-pill" x="200" y="410" width="310" height="22" rx="6"/><text class="d-mono" x="210" y="425">passwords.rs</text><text class="d-dim" x="500" y="425" text-anchor="end">비밀번호 (키체인)</text>
+  <rect class="d-pill" x="200" y="437" width="310" height="22" rx="6"/><text class="d-mono" x="210" y="452">meet.rs</text><text class="d-dim" x="500" y="452" text-anchor="end">영상회의 서버·중계</text>
+  <rect class="d-pill" x="200" y="464" width="310" height="22" rx="6"/><text class="d-mono" x="210" y="479">session_cookies.rs</text><text class="d-dim" x="500" y="479" text-anchor="end">로그인 유지</text>
+  <rect class="d-pill" x="200" y="491" width="310" height="22" rx="6"/><text class="d-mono" x="210" y="506">store.rs</text><text class="d-dim" x="500" y="506" text-anchor="end">SQLite 저장소</text>
+  <rect class="d-pill" x="200" y="518" width="310" height="22" rx="6"/><text class="d-mono" x="210" y="533">platform.rs</text><text class="d-dim" x="500" y="533" text-anchor="end">스크린샷·확장 엔진·OS 차이</text>
 
-  <text class="d-head" x="530" y="76">웹뷰 (OS 웹 엔진)</text>
-  <rect class="d-box" x="530" y="86" width="190" height="40" rx="8"/><text class="d-mono" x="542" y="104">ui</text><text class="d-dim" x="542" y="120">탭줄 · 툴바 · 북마크 바</text>
-  <rect class="d-box" x="530" y="136" width="190" height="40" rx="8"/><text class="d-mono" x="542" y="154">palette</text><text class="d-dim" x="542" y="170">스포트라이트 오버레이</text>
-  <rect class="d-box d-stack" x="536" y="192" width="190" height="56" rx="8"/>
-  <rect class="d-box" x="530" y="186" width="190" height="56" rx="8"/><text class="d-mono" x="542" y="204">tab-N</text><text class="d-dim" x="542" y="220">웹 페이지 + content.js</text>
-  <rect class="d-box" x="530" y="256" width="190" height="60" rx="8"/><text class="d-mono" x="542" y="274">kite://</text><text class="d-dim" x="542" y="290">새 탭 · 설정 · 북마크</text>
+  <text class="d-head" x="610" y="76">웹뷰 (OS 웹 엔진, 창마다)</text>
+  <rect class="d-box" x="610" y="86" width="254" height="38" rx="8"/><text class="d-mono" x="622" y="102">ui</text><text class="d-dim" x="622" y="117">탭줄 · 툴바 · 북마크 바</text>
+  <rect class="d-box" x="610" y="132" width="254" height="38" rx="8"/><text class="d-mono" x="622" y="148">side</text><text class="d-dim" x="622" y="163">세로 탭 · 북마크 목록</text>
+  <rect class="d-box" x="610" y="178" width="254" height="38" rx="8"/><text class="d-mono" x="622" y="194">omni</text><text class="d-dim" x="622" y="209">주소창 추천 목록</text>
+  <rect class="d-box" x="610" y="224" width="254" height="38" rx="8"/><text class="d-mono" x="622" y="240">palette · launcher</text><text class="d-dim" x="622" y="255">스포트라이트 (창 안 · 떠 있는 창)</text>
+  <rect class="d-box" x="610" y="270" width="254" height="38" rx="8"/><text class="d-mono" x="622" y="286">siteinfo</text><text class="d-dim" x="622" y="301">사이트 정보 말풍선 창</text>
+  <rect class="d-box" x="610" y="316" width="254" height="38" rx="8"/><text class="d-mono" x="622" y="332">cover</text><text class="d-dim" x="622" y="347">되살리는 탭의 마지막 화면</text>
+  <rect class="d-box d-stack" x="616" y="367" width="254" height="50" rx="8"/><rect class="d-box" x="610" y="362" width="254" height="50" rx="8"/><text class="d-mono" x="622" y="378">tab-N</text><text class="d-dim" x="622" y="393">웹 페이지 + content.js</text>
+  <rect class="d-box d-stack" x="616" y="425" width="254" height="38" rx="8"/><rect class="d-box" x="610" y="420" width="254" height="38" rx="8"/><text class="d-mono" x="622" y="436">popup-N</text><text class="d-dim" x="622" y="451">로그인·결제 팝업 창</text>
+  <rect class="d-box" x="610" y="466" width="254" height="50" rx="8"/><text class="d-mono" x="622" y="482">kite://</text><text class="d-dim" x="622" y="497">home · settings · bookmarks · meet · neterror</text>
 
-  <line class="d-line" x1="400" y1="106" x2="530" y2="106" marker-end="url(#d-head)" marker-start="url(#d-head)"/><text class="d-label" x="465" y="101" text-anchor="middle">invoke · 이벤트</text>
-  <line class="d-line" x1="400" y1="156" x2="530" y2="156" marker-end="url(#d-head)" marker-start="url(#d-head)"/><text class="d-label" x="465" y="151" text-anchor="middle">invoke · 이벤트</text>
-  <line class="d-line" x1="400" y1="204" x2="530" y2="204" marker-end="url(#d-head)"/><text class="d-label" x="465" y="199" text-anchor="middle">JS 실행</text>
-  <line class="d-line" x1="530" y1="230" x2="400" y2="230" marker-end="url(#d-head)"/><text class="d-label" x="465" y="225" text-anchor="middle">content_event</text>
-  <line class="d-line" x1="400" y1="286" x2="530" y2="286" marker-end="url(#d-head)" marker-start="url(#d-head)"/><text class="d-label" x="465" y="281" text-anchor="middle">invoke (로컬만)</text>
+  <line class="d-line" x1="520" y1="105" x2="610" y2="105" marker-end="url(#d-head)" marker-start="url(#d-head)"/><text class="d-label" x="565" y="100" text-anchor="middle">invoke · 이벤트</text>
+  <line class="d-line" x1="520" y1="151" x2="610" y2="151" marker-end="url(#d-head)" marker-start="url(#d-head)"/>
+  <line class="d-line" x1="520" y1="197" x2="610" y2="197" marker-end="url(#d-head)" marker-start="url(#d-head)"/>
+  <line class="d-line" x1="520" y1="243" x2="610" y2="243" marker-end="url(#d-head)" marker-start="url(#d-head)"/>
+  <line class="d-line" x1="520" y1="289" x2="610" y2="289" marker-end="url(#d-head)" marker-start="url(#d-head)"/>
+  <line class="d-line" x1="520" y1="335" x2="610" y2="335" marker-end="url(#d-head)" marker-start="url(#d-head)"/>
+  <line class="d-line" x1="520" y1="380" x2="610" y2="380" marker-end="url(#d-head)"/><text class="d-label" x="565" y="375" text-anchor="middle">JS 실행</text>
+  <line class="d-line" x1="610" y1="402" x2="520" y2="402" marker-end="url(#d-head)"/><text class="d-label" x="565" y="397" text-anchor="middle">content_event</text>
+  <line class="d-line" x1="520" y1="494" x2="610" y2="494" marker-end="url(#d-head)" marker-start="url(#d-head)"/><text class="d-label" x="565" y="489" text-anchor="middle">invoke (로컬만)</text>
 
-  <rect class="d-ext" x="16" y="186" width="140" height="58" rx="10"/>
-  <text class="d-head" x="86" y="210" text-anchor="middle">AI 에이전트</text>
-  <text class="d-dim" x="86" y="228" text-anchor="middle">Claude Code 등</text>
-  <line class="d-line" x1="156" y1="217" x2="200" y2="217" marker-end="url(#d-head)"/>
-  <text class="d-label" x="86" y="262" text-anchor="middle">HTTP · 127.0.0.1</text>
-  <text class="d-label" x="86" y="276" text-anchor="middle">Bearer 토큰</text>
+  <rect class="d-ext" x="16" y="214" width="150" height="56" rx="10"/><text class="d-head" x="91" y="236" text-anchor="middle">AI 에이전트</text><text class="d-dim" x="91" y="253" text-anchor="middle">Claude Code 등</text><text class="d-label" x="91" y="284" text-anchor="middle">HTTP · 127.0.0.1 · Bearer</text><line class="d-line" x1="166" y1="259" x2="200" y2="259" marker-end="url(#d-head)"/>
+  <rect class="d-ext" x="16" y="294" width="150" height="84" rx="10"/><text class="d-head" x="91" y="316" text-anchor="middle">웹사이트</text><text class="d-dim" x="91" y="333" text-anchor="middle">아이콘 · 인증서 · 진단</text><text class="d-label" x="91" y="392" text-anchor="middle">Kite가 직접 연결 (HTTPS)</text><line class="d-line" x1="166" y1="313" x2="200" y2="313" marker-end="url(#d-head)"/><line class="d-line" x1="166" y1="340" x2="200" y2="340" marker-end="url(#d-head)"/><line class="d-line" x1="166" y1="367" x2="200" y2="367" marker-end="url(#d-head)"/>
+  <rect class="d-ext" x="16" y="417" width="150" height="56" rx="10"/><text class="d-head" x="91" y="439" text-anchor="middle">회의 참가자</text><text class="d-dim" x="91" y="456" text-anchor="middle">다른 Kite</text><text class="d-label" x="91" y="487" text-anchor="middle">TCP · UPnP · WebRTC</text><line class="d-line" x1="166" y1="448" x2="200" y2="448" marker-end="url(#d-head)" marker-start="url(#d-head)"/>
 
-  <rect class="d-os" x="16" y="364" width="728" height="84" rx="12"/>
-  <text class="d-title" x="30" y="438">운영체제 (macOS · Windows)</text>
-  <rect class="d-box" x="30" y="378" width="140" height="38" rx="8"/>
-  <text class="d-dim" x="100" y="401" text-anchor="middle">외부 앱 · f5-epi: 등</text>
-  <rect class="d-box" x="190" y="378" width="210" height="38" rx="8"/>
-  <text class="d-dim" x="295" y="401" text-anchor="middle">kite.db (SQLite) · mcp-token</text>
-  <rect class="d-box" x="530" y="378" width="190" height="38" rx="8"/>
-  <text class="d-dim" x="625" y="401" text-anchor="middle">WKWebView · WebView2</text>
+  <rect class="d-os" x="16" y="585" width="868" height="92" rx="12"/>
+  <text class="d-title" x="30" y="667">운영체제 (macOS · Windows)</text>
+  <rect class="d-box" x="30" y="599" width="140" height="40" rx="8"/>
+  <text class="d-dim" x="100" y="623" text-anchor="middle">외부 앱 · f5-epi: 등</text>
+  <rect class="d-box" x="190" y="599" width="330" height="40" rx="8"/>
+  <text class="d-dim" x="355" y="616" text-anchor="middle">kite.db (SQLite) · mcp-token · session-cookies.json</text>
+  <text class="d-dim" x="355" y="631" text-anchor="middle">키체인 / 자격 증명 관리자 (비밀번호 키)</text>
+  <rect class="d-box" x="610" y="599" width="254" height="40" rx="8"/>
+  <text class="d-dim" x="737" y="623" text-anchor="middle">WKWebView · WebView2</text>
 
-  <line class="d-line" x1="295" y1="332" x2="295" y2="378" marker-end="url(#d-head)"/>
-  <text class="d-label" x="301" y="356">읽기·쓰기</text>
-  <path class="d-line" d="M190 320 H100 V378" fill="none" marker-end="url(#d-head)"/>
-  <text class="d-label" x="106" y="356">확인 후 열기</text>
-  <line class="d-line d-dash" x1="625" y1="332" x2="625" y2="378"/>
-  <text class="d-label" x="631" y="356">렌더링</text>
+  <line class="d-line" x1="355" y1="557" x2="355" y2="599" marker-end="url(#d-head)"/>
+  <text class="d-label" x="361" y="581">읽기·쓰기</text>
+  <path class="d-line" d="M190 543 H100 V599" fill="none" marker-end="url(#d-head)"/>
+  <text class="d-label" x="106" y="581">확인 후 열기</text>
+  <line class="d-line d-dash" x1="737" y1="567" x2="737" y2="599"/>
+  <text class="d-label" x="743" y="591">렌더링</text>
 </svg>

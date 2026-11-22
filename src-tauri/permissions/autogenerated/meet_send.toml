@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-meet-send"
+description = "Enables the meet_send command without any pre-configured scope."
+commands.allow = ["meet_send"]
+
+[[permission]]
+identifier = "deny-meet-send"
+description = "Denies the meet_send command without any pre-configured scope."
+commands.deny = ["meet_send"]

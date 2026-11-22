@@ -1,0 +1,21 @@
+:root { color-scheme: light dark; --accent: #7c5cff; --muted: #8a8a96; --line: rgba(128, 128, 140, .22); }
+* { box-sizing: border-box; }
+body { width: 300px; margin: 0; padding: 14px 16px 16px; font: 13px/1.5 -apple-system, "Segoe UI", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; }
+header { display: flex; align-items: center; gap: 10px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+header img { width: 32px; height: 32px; }
+header b { display: block; font-size: 14px; }
+header small { color: var(--muted); }
+section { padding-top: 12px; }
+.label { margin: 0 0 6px; font-weight: 600; font-size: 12px; }
+.hint { font-weight: 400; color: var(--muted); }
+.count { display: flex; align-items: center; gap: 8px; }
+#n { min-width: 44px; font-size: 26px; font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; }
+button { height: 30px; padding: 0 14px; border: 0; border-radius: 15px; background: var(--accent); color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
+button.ghost { background: transparent; color: var(--muted); border: 1px solid var(--line); }
+ul { margin: 0; padding: 0; list-style: none; }
+li { padding: 3px 0; }
+li::before { content: "…"; display: inline-block; width: 20px; color: var(--muted); }
+li.ok::before { content: "✓"; color: #2fa86b; font-weight: 700; }
+li.fail::before { content: "✕"; color: #d03b3b; font-weight: 700; }
+li.info::before { content: "•"; }
+a { color: var(--accent); }

@@ -1,7 +1,7 @@
 {
   "name": "kite-browser",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -10,10 +10,12 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@tauri-apps/api": "^2.12.4"
+    "@tauri-apps/api": "^2.12.4",
+    "three": "^0.169.0"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.12.4",
+    "@types/three": "^0.169.0",
     "typescript": "~6.0.3",
     "vite": "^8.3.8",
     "vitest": "^5.1.0"

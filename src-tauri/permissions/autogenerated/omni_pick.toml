@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-omni-pick"
+description = "Enables the omni_pick command without any pre-configured scope."
+commands.allow = ["omni_pick"]
+
+[[permission]]
+identifier = "deny-omni-pick"
+description = "Denies the omni_pick command without any pre-configured scope."
+commands.deny = ["omni_pick"]

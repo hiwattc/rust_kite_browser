@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "Kite 샘플 확장",
+  "version": "1.0.0",
+  "description": "Kite의 확장 프로그램 지원을 확인하는 샘플: 툴바 아이콘, 팝업, 저장소, 콘텐츠 스크립트.",
+  "icons": { "16": "icons/icon16.png", "32": "icons/icon32.png", "48": "icons/icon48.png", "128": "icons/icon128.png" },
+  "action": {
+    "default_title": "Kite 샘플 확장",
+    "default_popup": "popup.html",
+    "default_icon": { "16": "icons/icon16.png", "32": "icons/icon32.png" }
+  },
+  "permissions": ["storage"],
+  "content_scripts": [{ "matches": ["https://example.com/*"], "js": ["content.js"], "run_at": "document_idle" }]
+}

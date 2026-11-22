@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-meet-join"
+description = "Enables the meet_join command without any pre-configured scope."
+commands.allow = ["meet_join"]
+
+[[permission]]
+identifier = "deny-meet-join"
+description = "Denies the meet_join command without any pre-configured scope."
+commands.deny = ["meet_join"]

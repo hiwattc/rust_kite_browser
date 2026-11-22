@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-tab-drag-drop"
+description = "Enables the tab_drag_drop command without any pre-configured scope."
+commands.allow = ["tab_drag_drop"]
+
+[[permission]]
+identifier = "deny-tab-drag-drop"
+description = "Denies the tab_drag_drop command without any pre-configured scope."
+commands.deny = ["tab_drag_drop"]

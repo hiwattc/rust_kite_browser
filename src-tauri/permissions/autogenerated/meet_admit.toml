@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-meet-admit"
+description = "Enables the meet_admit command without any pre-configured scope."
+commands.allow = ["meet_admit"]
+
+[[permission]]
+identifier = "deny-meet-admit"
+description = "Denies the meet_admit command without any pre-configured scope."
+commands.deny = ["meet_admit"]

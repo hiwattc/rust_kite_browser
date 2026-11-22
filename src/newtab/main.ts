@@ -1,6 +1,9 @@
 // New-tab page, shown inside a content tab. It may only call `content_event` (like any web page).
 import { invoke } from "@tauri-apps/api/core";
 import "./newtab.css";
+import { initTheme } from "../shared/theme";
+
+initTheme();
 
 const isMac = navigator.platform.toLowerCase().includes("mac");
 const k = (s: string) => `<kbd>${s}</kbd>`;

@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- Kite app icon: mint tile (macOS grid: 824×824 at 100, radius 186) with a white kite. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#8AF5D6"/>
+      <stop offset="0.5" stop-color="#35D6B2"/>
+      <stop offset="1" stop-color="#0FA58C"/>
+    </linearGradient>
+    <linearGradient id="shine" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.32"/>
+      <stop offset="0.45" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect x="100" y="112" width="824" height="824" rx="186" fill="#000" opacity="0.18"/>
+  <rect x="100" y="100" width="824" height="824" rx="186" fill="url(#bg)"/>
+  <rect x="100" y="100" width="824" height="824" rx="186" fill="url(#shine)"/>
+  <!-- tail, from the kite's bottom tip -->
+  <path d="M566 700 C 600 760, 520 770, 540 820 S 600 870, 560 900" fill="none" stroke="#FFFFFF" stroke-width="13" stroke-linecap="round"/>
+  <g fill="#FFFFFF">
+    <path d="M556 766 l-44 -16 l6 34 z M556 766 l40 22 l-30 18 z" transform="rotate(10 556 766)"/>
+    <path d="M552 846 l-42 -10 l10 32 z M552 846 l42 16 l-28 22 z" transform="rotate(-8 552 846)"/>
+  </g>
+  <!-- kite (shadow, then body) -->
+  <g transform="rotate(-12 512 440)">
+    <path d="M512 200 L688 410 L512 680 L336 410 Z" fill="#05735F" opacity="0.28" transform="translate(10 18)"/>
+    <path d="M512 200 L688 410 L512 410 Z" fill="#FFFFFF"/>
+    <path d="M512 200 L512 410 L336 410 Z" fill="#E9FFF8"/>
+    <path d="M336 410 L512 410 L512 680 Z" fill="#D2FAEE"/>
+    <path d="M512 410 L688 410 L512 680 Z" fill="#F4FFFB"/>
+    <path d="M512 206 L512 674 M342 410 L682 410" stroke="#22BFA0" stroke-width="10" stroke-linecap="round" opacity="0.6"/>
+  </g>
+</svg>

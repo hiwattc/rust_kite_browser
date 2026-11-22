@@ -30,10 +30,10 @@ use rmcp::transport::{StreamableHttpServerConfig, StreamableHttpService};
 use rmcp::{ErrorData as McpError, RoleServer, ServerHandler};
 use serde::Serialize;
 use serde_json::{Value, json};
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Manager};
 use tokio_util::sync::CancellationToken;
 
-use crate::browser::{Browser, NEWTAB, UI};
+use crate::browser::{Browser, NEWTAB};
 use crate::error::AppError;
 
 pub const DEFAULT_PORT: u16 = 17321;
@@ -445,7 +445,7 @@ fn pick_tab(b: &Browser, a: &Value) -> Result<u64, String> {
 }
 
 fn activity(b: &Browser, tab: u64, tool: &str) {
-    let _ = b.0.app.emit_to(UI, "agent-activity", json!({ "tabId": tab, "tool": tool }));
+    b.emit_all_ui("agent-activity", json!({ "tabId": tab, "tool": tool }));
 }
 
 fn page_line(b: &Browser, tab: u64) -> String {
@@ -552,12 +552,19 @@ async fn run(b: &Browser, tool: &str, a: &Value) -> Result<Vec<ContentBlock>, St
                 _ => {
                     let active = b.active();
                     let agent = b.agent_tab();
-                    let lines: Vec<String> = b
-                        .tabs()
+                    // grouped by window (several windows: each tab says which)
+                    let mut tabs = b.tabs();
+                    tabs.sort_by_key(|t| t.win);
+                    let wins = b.wins();
+                    let lines: Vec<String> = tabs
                         .iter()
                         .enumerate()
                         .map(|(i, t)| {
                             let mut flags = Vec::new();
+                            let win_flag = format!("창 {}", wins.iter().position(|w| *w == t.win).unwrap_or(0) + 1);
+                            if wins.len() > 1 {
+                                flags.push(win_flag.as_str());
+                            }
                             if Some(t.id) == active {
                                 flags.push("보는 중");
                             }
