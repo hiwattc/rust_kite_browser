@@ -652,9 +652,17 @@ impl Browser {
             }
             // With several webviews in one window none may hold the keyboard after the window
             // is re-activated: give it to the palette or the page, so shortcuts keep working.
+            // Only after a real re-activation: on Windows, focusing a child webview makes the
+            // window report losing and regaining focus at once, and answering that with
+            // another focus move loops forever (hundreds of events a second, UI hangs).
             tauri::WindowEvent::Focused(true) => {
                 b.0.state.lock().unwrap().focused = n;
-                b.focus_current();
+                if refocus_after_activation(n, true) {
+                    b.focus_current();
+                }
+            }
+            tauri::WindowEvent::Focused(false) => {
+                refocus_after_activation(n, false);
             }
             tauri::WindowEvent::CloseRequested { .. } => b.window_closing(n),
             tauri::WindowEvent::Destroyed => b.window_gone(n),
@@ -2076,6 +2084,27 @@ impl Browser {
     }
 }
 
+/// Focus events of window `n`: `true` when a focus gain should move the keyboard into the
+/// window's page — the window was really away (unfocused for a while, or never focused), not just
+/// echoing a focus move between its own webviews.
+fn refocus_after_activation(n: u32, gained: bool) -> bool {
+    use std::collections::HashMap;
+    use std::time::Instant;
+    /// Shorter than any real switch to another app and back; longer than the echo (≈0–10 ms).
+    const ECHO: Duration = Duration::from_millis(250);
+    static LOST: Mutex<Option<HashMap<u32, Instant>>> = Mutex::new(None);
+    let mut lost = LOST.lock().unwrap();
+    let lost = lost.get_or_insert_with(HashMap::new);
+    if !gained {
+        lost.insert(n, Instant::now());
+        return false;
+    }
+    match lost.get(&n) {
+        Some(t) => t.elapsed() >= ECHO,
+        None => true,
+    }
+}
+
 fn event_name(e: &tauri::WindowEvent) -> &'static str {
     match e {
         tauri::WindowEvent::Resized(_) => "Resized",
@@ -2092,6 +2121,19 @@ fn event_name(e: &tauri::WindowEvent) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn focus_echo_does_not_refocus() {
+        // First activation of a window: refocus.
+        assert!(refocus_after_activation(900, true));
+        // Lost and regained at once (a focus move inside the window): no refocus, so no loop.
+        refocus_after_activation(900, false);
+        assert!(!refocus_after_activation(900, true));
+        // Away for a while (another app), then back: refocus.
+        refocus_after_activation(900, false);
+        std::thread::sleep(Duration::from_millis(300));
+        assert!(refocus_after_activation(900, true));
+    }
 
     #[test]
     fn reads_the_safari_version() {

@@ -138,6 +138,14 @@ jobs:
         with:
           name: kite-windows-screen
           path: ${{ runner.temp }}/screen.png
-      - name: Fail when the UI hung
-        if: env.HUNG != '0'
-        run: exit 1
+      - name: Fail when the UI hung, stalled after startup, or events stormed
+        if: always()
+        shell: pwsh
+        run: |
+          $log = Join-Path $env:APPDATA "com.kite.browser\kite.log"
+          $text = if (Test-Path $log) { Get-Content $log -Raw } else { "" }
+          $storms = ([regex]::Matches($text, "window event storm")).Count
+          # A stall while the first window starts WebView2 is expected; any later one is not.
+          $stalls = ([regex]::Matches($text, "main thread stalled")).Count - ([regex]::Matches($text, "stalled.*create window 1")).Count
+          Write-Host "not responding: $env:HUNG, storms: $storms, stalls after startup: $stalls"
+          if ($env:HUNG -ne "0" -or $storms -gt 0 -or $stalls -gt 0) { exit 1 }
