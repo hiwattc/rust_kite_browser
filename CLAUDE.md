@@ -32,6 +32,8 @@ Rust 브라우저. Tauri v2 + OS 웹뷰(Windows WebView2 / macOS WKWebView) + Vi
 - 창 `Focused` 이벤트 처리에서 포커스를 다시 옮기지 않는다(Windows에선 자식 웹뷰로 포커스를 옮기면 창이 Focused(false)/(true)를 바로 다시 보내 무한 반복 → 응답 없음). 지금은 `refocus_after_activation`으로 250ms 넘게 떠나 있었을 때만.
 - 로그는 앱 데이터 폴더의 `kite.log`(직전 실행은 `kite.prev.log`). `diag.rs`의 감시 스레드가 메인 스레드가 4초 넘게 멈추면 마지막 동작(`diag::mark`)을, 창 이벤트가 초당 300개를 넘으면 storm을 기록. Windows 실기 확인은 `.github/workflows/windows-smoke.yml`(diag/** 브랜치 푸시나 수동 실행: 빌드 → 실행 → MCP 조작·실제 클릭 → 응답 없음/storm이면 실패, kite.exe·로그·화면 업로드).
 - `cargo fmt`를 돌리지 않는다(rustfmt 설정이 없고 기존 코드는 긴 줄 스타일이라 전체가 바뀜).
+- Windows 창은 제목 표시줄 없음(`decorations(false)` + 그림자): 탭줄(`ui` 웹뷰)이 최소화·최대화·닫기 버튼과 이동 영역(`data-tauri-drag-region`), 위쪽 가장자리 크기 조절(`startResizeDragging`)을 맡고, 좌·우·아래 크기 조절은 창 그림자가 함. Tauri 기본 크기 조절 스크립트는 웹뷰 하나짜리 창에만 붙어서 직접 처리.
+- 전역 단축키 기본값: macOS `Alt+Space`, Windows `F9`. 런처 창은 메인 스레드 콜백 안에서 만들지 않는다(백그라운드 작업에서 build).
 - `gen`은 edition 2024 예약어. Windows 전용/맥 전용 코드는 `platform.rs`에 cfg로 모으고 양쪽 모두 컴파일 확인.
 - 프론트에서 이벤트는 `getCurrentWebview().listen` (전역 `listen`은 다른 창으로 보낸 이벤트도 받음). 창마다 다른 이벤트는 `ui_label(n)`로 `emit_to`.
 - UI 문자열은 한국어. 색·크기는 `src/styles/base.css` 토큰을 쓴다.

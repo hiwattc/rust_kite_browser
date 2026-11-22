@@ -28,3 +28,6 @@ dist-ssr
 .vitest/
 src-tauri/target
 src-tauri/gen/schemas
+
+# build output from a relative CARGO_TARGET_DIR
+src-tauri/src-tauri
