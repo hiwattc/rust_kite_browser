@@ -579,7 +579,13 @@ impl Browser {
         // macOS: tabs in the title bar area, next to the traffic lights.
         #[cfg(target_os = "macos")]
         let wb = wb.title_bar_style(tauri::TitleBarStyle::Overlay).hidden_title(true);
+        let t0 = std::time::Instant::now();
+        let step = |what: &str| {
+            crate::diag::mark(format!("window {n}: {what} ({}ms)", t0.elapsed().as_millis()));
+            tracing::info!(n, ms = t0.elapsed().as_millis() as u64, "window setup: {what}");
+        };
         let window = wb.build().map_err(err)?;
+        step("window");
         self.0.state.lock().unwrap().wins.insert(n, Win { active: None, chrome_height: DEFAULT_CHROME_HEIGHT, bounds: None });
         self.note_bounds(n, &window);
         window
@@ -591,6 +597,7 @@ impl Browser {
                 LogicalSize::new(w, DEFAULT_CHROME_HEIGHT),
             )
             .map_err(err)?;
+        step("ui webview");
         let palette = window
             .add_child(
                 WebviewBuilder::new(palette_label(n), WebviewUrl::App("palette.html".into())).zoom_hotkeys_enabled(false).focused(false).browser_extensions_enabled(true),
@@ -599,6 +606,7 @@ impl Browser {
             )
             .map_err(err)?;
         let _ = palette.hide();
+        step("palette webview");
         let omni = window
             .add_child(
                 WebviewBuilder::new(omni_label(n), WebviewUrl::App("omni.html".into())).zoom_hotkeys_enabled(false).focused(false).accept_first_mouse(true).browser_extensions_enabled(true),
@@ -607,6 +615,7 @@ impl Browser {
             )
             .map_err(err)?;
         let _ = omni.hide();
+        step("omni webview");
         let cover = window
             .add_child(
                 WebviewBuilder::new(cover_label(n), WebviewUrl::App("cover.html".into())).zoom_hotkeys_enabled(false).focused(false).browser_extensions_enabled(true),
@@ -615,6 +624,7 @@ impl Browser {
             )
             .map_err(err)?;
         let _ = cover.hide();
+        step("cover webview");
         let side = window
             .add_child(
                 WebviewBuilder::new(side_label(n), WebviewUrl::App("side.html".into())).zoom_hotkeys_enabled(false).focused(false).accept_first_mouse(true).browser_extensions_enabled(true),
@@ -623,6 +633,7 @@ impl Browser {
             )
             .map_err(err)?;
         let _ = side.hide();
+        step("side webview");
         let b = self.clone();
         window.on_window_event(move |e| {
             crate::diag::event();
