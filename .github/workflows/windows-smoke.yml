@@ -127,6 +127,10 @@ jobs:
             $q = Rect; $W = $q.Rt - $q.L
             # move: drag the empty part of the tab strip
             [U]::Drag([int]($q.L + $W * 0.62), $q.T + 18, 80, 40); Start-Sleep -Milliseconds 600; Show "after drag-move (+80,+40)"
+            # back where it was (the runner's screen is small: keep the buttons on it), and narrower than the screen
+            $q = Rect; [U]::Drag([int]($q.L + $W * 0.62), $q.T + 18, -80, -40); Start-Sleep -Milliseconds 600; Show "after drag back"
+            $q = Rect; if ($q.Rt -gt 1000) { [U]::Drag($q.Rt + 3, [int](($q.T + $q.B) / 2), -140, 0); Start-Sleep -Milliseconds 600; Show "after shrink (right edge -140)" }
+            $q = Rect; $W = $q.Rt - $q.L
             # maximize / restore with the strip buttons (46px each, right edge)
             $q = Rect; [U]::Click($q.Rt - 69, $q.T + 18); Start-Sleep -Seconds 1; Show "after max click"
             $wa = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea; Write-Host "work area $($wa.Left),$($wa.Top)-$($wa.Right),$($wa.Bottom)"
