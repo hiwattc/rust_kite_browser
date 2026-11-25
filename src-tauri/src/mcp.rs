@@ -217,9 +217,11 @@ pub fn tools() -> Vec<Tool> {
     vec![
         Tool::new(
             "browser_tabs",
-            "탭 목록 보기/새 탭/선택/닫기. action=list는 id·제목·주소·로딩 여부. new는 url(선택)로 새 탭을 열고 그 탭을 이후 기본 대상으로 삼음. select는 탭을 화면에 보여 주고 기본 대상으로 삼음.",
+            "탭 목록 보기/새 탭/선택/닫기. action=list는 id·제목·주소·로딩 여부. new는 url(선택)로 새 탭을 열고 그 탭을 이후 기본 대상으로 삼음. select는 탭을 화면에 보여 주고 기본 대상으로 삼음. split은 tab_ids의 탭(같은 창, 2~16개)을 분할 보기(최대 4×4 격자)로 나란히 보여 줌, unsplit은 분할 보기 해제. split에 layout(grid 격자·columns 좌우·stack 위아래 쌓기)을 주면 그 배치로.",
             s(json!({
-                "action": { "type": "string", "enum": ["list", "new", "select", "close"] },
+                "action": { "type": "string", "enum": ["list", "new", "select", "close", "split", "unsplit"] },
+                "tab_ids": { "type": "array", "items": { "type": "integer" }, "description": "split에서 나란히 보여 줄 탭들" },
+                "layout": { "type": "string", "enum": ["grid", "columns", "stack"], "description": "split 배치" },
                 "tab_id": tab, "url": { "type": "string", "description": "new에서 열 주소" }
             }), &["action"]),
         ),
@@ -540,6 +542,19 @@ async fn run(b: &Browser, tool: &str, a: &Value) -> Result<Vec<ContentBlock>, St
                     b.activate(id).map_err(|e| e.user_message)?;
                     b.set_agent_tab(Some(id));
                     Ok(text(format!("탭을 선택했습니다.\n{}", page_line(b, id))))
+                }
+                "split" => {
+                    let ids: Vec<u64> = a.get("tab_ids").and_then(|v| v.as_array()).map(|v| v.iter().filter_map(|x| x.as_u64()).collect()).unwrap_or_default();
+                    if let Some(l) = arg_str(a, "layout").and_then(crate::browser::SplitLayout::parse) {
+                        let win = ids.first().and_then(|i| b.tab(*i)).map(|t| t.win).unwrap_or_else(|| b.focused());
+                        b.set_split_layout(win, l);
+                    }
+                    b.split_tabs(&ids).map_err(|e| e.user_message)?;
+                    Ok(text(format!("분할 보기: {:?}", b.split_of(b.focused()))))
+                }
+                "unsplit" => {
+                    b.unsplit(b.focused());
+                    Ok(text("분할 보기를 해제했습니다."))
                 }
                 "close" => {
                     let id = match arg_u64(a, "tab_id") {

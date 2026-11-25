@@ -11,8 +11,20 @@ import { icons } from "../shared/icons";
 import { NEWTAB, type BarItem, type BrowserState, type DownloadsSnapshot, type Init, type Tab, type ToolbarExt } from "../shared/types";
 import "./chrome.css";
 import { initTheme } from "../shared/theme";
+import { loadIcons, savedIcon } from "../shared/favicons";
 
 initTheme();
+// Split view boundaries and the active pane's frame take the theme's accent (the color of the
+// line under split tabs in the strip).
+{
+  const accent = () => {
+    const c = getComputedStyle(document.documentElement).getPropertyValue("--accent").trim();
+    if (c) invoke("pane_color", { color: c }).catch(() => {});
+  };
+  new MutationObserver(accent).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme", "class"] });
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", accent);
+  accent();
+}
 
 const $ = <T extends HTMLElement>(sel: string) => document.querySelector(sel) as T;
 const warnIcon = `<svg class="icon" viewBox="0 0 24 24"><path d="M12 3.5l9.5 16.5h-19z"/><path d="M12 10v4.5M12 17.3v.2"/></svg>`;
@@ -57,7 +69,9 @@ document.body.innerHTML = `
   <div class="bbar" id="bbar" hidden></div>
 `;
 
-let state: BrowserState = { tabs: [], active: null, agentTab: null, mcp: { running: false, port: 0, url: "" }, side: false };
+let state: BrowserState = { tabs: [], active: null, agentTab: null, mcp: { running: false, port: 0, url: "" }, side: false, split: [] };
+/** Tabs picked with Ctrl/⌘+click or Shift+click (for split view); empty = just the active tab. */
+const picked = new Set<number>();
 let keymap: Record<string, string> = {};
 let editing = false;
 
@@ -86,23 +100,44 @@ function host(u: string) {
   }
 }
 
+/** Tab elements kept between renders (by tab id) with what their contents were drawn from:
+ * rebuilding every tab on each state update recreated their favicon images, and the other tabs
+ * flickered whenever one was picked. Now only a tab whose contents changed is rebuilt. */
+const tabEls = new Map<number, { el: HTMLElement; key: string }>();
+
 function tabEl(t: Tab): HTMLElement {
-  const el = document.createElement("div");
-  el.className = "tab";
-  el.dataset.id = String(t.id);
   const title = t.title || (t.url === NEWTAB ? "새 탭" : host(t.url));
-  el.title = `${title}\n${shownUrl(t)}`;
-  const fav = t.loading
-    ? `<span class="spinner"></span>`
-    : t.favicon
-      ? `<img class="fav" src="${t.favicon.replace(/"/g, "&quot;")}" alt="" />`
-      : `<span class="fav-ph">${icons.globe}</span>`;
-  el.innerHTML = `${fav}<span class="title"></span>${t.id === state.agentTab ? `<span class="tab-bot" title="에이전트 대상 탭">${icons.bot}</span>` : ""}<button class="tab-close" title="탭 닫기">${icons.close}</button>`;
-  (el.querySelector(".title") as HTMLElement).textContent = title;
-  const img = el.querySelector("img");
-  if (img) img.onerror = () => img.replaceWith(Object.assign(document.createElement("span"), { className: "fav-ph", innerHTML: icons.globe }));
+  const agent = t.id === state.agentTab;
+  const key = JSON.stringify([title, shownUrl(t), t.loading, t.favicon, agent]);
+  let kept = tabEls.get(t.id);
+  if (!kept || kept.key !== key) {
+    const el = kept?.el ?? document.createElement("div");
+    el.className = "tab";
+    el.dataset.id = String(t.id);
+    el.title = `${title}\n${shownUrl(t)}`;
+    const fav = t.loading
+      ? `<span class="spinner"></span>`
+      : t.favicon
+        ? `<img class="fav" src="${t.favicon.replace(/"/g, "&quot;")}" alt="" />`
+        : `<span class="fav-ph">${icons.globe}</span>`;
+    el.innerHTML = `${fav}<span class="title"></span>${agent ? `<span class="tab-bot" title="에이전트 대상 탭">${icons.bot}</span>` : ""}<button class="tab-close" title="탭 닫기">${icons.close}</button>`;
+    (el.querySelector(".title") as HTMLElement).textContent = title;
+    const img = el.querySelector("img");
+    if (img) img.onerror = () => img.replaceWith(Object.assign(document.createElement("span"), { className: "fav-ph", innerHTML: icons.globe }));
+    kept = { el, key };
+    tabEls.set(t.id, kept);
+  }
+  const el = kept.el;
+  // left over from a drag that ended
+  el.style.transform = "";
+  el.classList.remove("lifted");
   el.classList.toggle("active", t.id === state.active);
-  el.classList.toggle("agent-tab", t.id === state.agentTab);
+  el.classList.toggle("agent-tab", agent);
+  el.classList.toggle("picked", picked.size > 1 && picked.has(t.id));
+  const pane = state.split.indexOf(t.id);
+  el.classList.toggle("split", pane >= 0);
+  el.classList.toggle("split-first", pane === 0);
+  el.classList.toggle("split-last", pane >= 0 && pane === state.split.length - 1);
   return el;
 }
 
@@ -110,7 +145,12 @@ function render() {
   // while a tab slides in this strip, endDrag() renders the latest state (once torn off, the
   // strip may update: the tab left it)
   if (drag?.el && !drag.torn) return;
-  tabsEl.replaceChildren(...state.tabs.map(tabEl));
+  for (const id of picked) if (!state.tabs.some((t) => t.id === id)) picked.delete(id);
+  const els = state.tabs.map(tabEl);
+  for (const id of tabEls.keys()) if (!state.tabs.some((t) => t.id === id)) tabEls.delete(id);
+  // Only when the strip's order or members changed: moving nodes is not free either.
+  const now = tabsEl.children;
+  if (now.length !== els.length || els.some((el, i) => now[i] !== el)) tabsEl.replaceChildren(...els);
   const t = activeTab();
   if (!editing) address.value = shownUrl(t);
   const secure = t?.url.startsWith("https://") && !t.error && !t.badCert;
@@ -142,6 +182,26 @@ tabsEl.addEventListener("mousedown", (e) => {
   const el = (e.target as HTMLElement).closest<HTMLElement>(".tab");
   if (!el) return;
   const id = Number(el.dataset.id);
+  // Ctrl/⌘+click picks tabs one by one, Shift+click a run from the active tab (then right click
+  // → split view). A plain click clears the pick.
+  if (e.button === 0 && (e.shiftKey || (isMac ? e.metaKey : e.ctrlKey))) {
+    e.preventDefault();
+    if (picked.size === 0 && state.active !== null) picked.add(state.active);
+    if (e.shiftKey) {
+      const ids = state.tabs.map((t) => t.id);
+      const a = ids.indexOf(state.active ?? id);
+      const b = ids.indexOf(id);
+      picked.clear();
+      for (const x of ids.slice(Math.min(a, b), Math.max(a, b) + 1)) picked.add(x);
+    } else if (picked.has(id) && id !== state.active) picked.delete(id);
+    else picked.add(id);
+    render();
+    return;
+  }
+  if (e.button === 0 && picked.size) {
+    picked.clear();
+    render();
+  }
   if (e.button === 1) {
     e.preventDefault();
     invoke("tab_close", { id });
@@ -173,6 +233,7 @@ let drag: Drag | null = null;
 tabsEl.addEventListener("pointerdown", (e) => {
   const el = (e.target as HTMLElement).closest<HTMLElement>(".tab");
   if (!el || e.button !== 0 || (e.target as HTMLElement).closest(".tab-close")) return;
+  if (e.shiftKey || e.ctrlKey || e.metaKey) return; // picking tabs, not dragging
   drag = { id: Number(el.dataset.id), x0: e.clientX, y0: e.clientY, others: [], from: -1, to: -1, slot: 0, mids: [], mid0: 0, grab: e.clientX - el.getBoundingClientRect().left, firstLeft: 0, sx: 0, sy: 0, frame: 0 };
   try {
     tabsEl.setPointerCapture(e.pointerId); // keep getting moves when the pointer leaves the strip
@@ -295,7 +356,13 @@ document.addEventListener("contextmenu", (e) => {
   const t = e.target as HTMLElement;
   if (t.closest("input, textarea, [contenteditable]")) return;
   e.preventDefault();
-  invoke("ui_menu", { x: e.clientX, y: e.clientY }).catch((err) => toast(String(err)));
+  // On a tab: the picked tabs (when it is one of them) or that tab, for the split view items.
+  const onTab = t.closest<HTMLElement>(".tab");
+  const id = onTab ? Number(onTab.dataset.id) : null;
+  const tabs = id === null ? null : picked.size > 1 && picked.has(id) ? state.tabs.map((x) => x.id).filter((x) => picked.has(x)) : [id];
+  picked.clear();
+  render();
+  invoke("ui_menu", { x: e.clientX, y: e.clientY, tabs, tab: id }).catch((err) => toast(String(err)));
 });
 $("#omni-icon").addEventListener("mousedown", (e) => {
   const icon = e.currentTarget as HTMLElement;
@@ -494,17 +561,12 @@ window.addEventListener(
 // ---- bookmark bar ----
 const bbar = $("#bbar");
 const escAttr = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
-function favicon(u: string) {
-  try {
-    const x = new URL(u);
-    return /^https?:$/.test(x.protocol) ? `${x.origin}/favicon.ico` : "";
-  } catch {
-    return "";
-  }
-}
+/** Only icons kept while the site was open (never fetched from the bookmarked site). */
+const favicon = savedIcon;
 function renderBar(items: BarItem[] | null) {
   bbar.hidden = !items;
   if (items) {
+    loadIcons(items.filter((it) => it.kind !== "folder").map((it) => it.url)).then((added) => added && renderBar(items));
     const html = items
       .map((it, i) => {
         const icon =
@@ -565,7 +627,7 @@ function openBarItem(e: MouseEvent, middle: boolean) {
   } else if (middle || (isMac ? e.metaKey : e.ctrlKey)) {
     invoke("tab_new", { url: it.url });
   } else {
-    invoke("navigate", { id: state.active, input: it.url }).catch((err) => toast(String(err)));
+    invoke("bookmark_open", { url: it.url }).catch((err) => toast(String(err)));
   }
 }
 function syncHeight() {

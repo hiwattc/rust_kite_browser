@@ -213,6 +213,7 @@ pub async fn clear_data(app: AppHandle, what: String) -> Result<String, AppError
             let wv = b.tabs().iter().find_map(|t| b.webview(t.id)).ok_or_else(|| AppError::new("열린 탭이 없습니다.", "no webview"))?;
             wv.clear_all_browsing_data().map_err(|e| AppError::new("사이트 데이터를 지우지 못했습니다.", e))?;
             crate::session_cookies::forget(&app);
+            b.0.store.favicons_clear()?;
             Ok("쿠키와 사이트 데이터를 지웠습니다. 로그인된 사이트에서 로그아웃됩니다.".into())
         }
         other => Err(AppError::new("알 수 없는 항목입니다.", other)),

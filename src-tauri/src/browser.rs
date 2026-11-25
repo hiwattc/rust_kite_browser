@@ -125,6 +125,8 @@ pub struct BrowserState {
     pub mcp: crate::mcp::Status,
     /// The vertical tab list on the left is open.
     pub side: bool,
+    /// Tabs shown side by side (split view, strip order), empty when none.
+    pub split: Vec<u64>,
 }
 
 #[derive(Clone)]
@@ -143,6 +145,13 @@ struct Win {
     chrome_height: f64,
     /// Outer position + inner size (logical), kept from move/resize events for the session.
     bounds: Option<[f64; 4]>,
+    /// Split view: these tabs (2..=SPLIT_MAX, strip order) share the page area in a grid while
+    /// one of them is active. Not kept in the session.
+    split: Vec<u64>,
+    /// Dragged boundaries: row height shares, and each row's pane width shares (empty: equal).
+    split_rows: Vec<f64>,
+    split_cols: Vec<Vec<f64>>,
+    split_layout: SplitLayout,
 }
 
 #[derive(Default)]
@@ -159,6 +168,120 @@ struct State {
     palette_height: f64,
     /// Internal page a tab may open next (set by the app right before navigating there).
     internal_pass: std::collections::HashMap<u64, &'static str>,
+    /// Tabs the tab strip's right-click menu was opened for (its split view items use them).
+    menu_tabs: Vec<u64>,
+    /// Theme accent (the tab strip's split view line): split view boundaries and frame.
+    pane_color: String,
+    /// The tab right-clicked (tab menu "탭 복제").
+    menu_tab: Option<u64>,
+    split_drag: Option<SplitDrag>,
+}
+
+/// Most tabs in one split view (a 4 × 4 grid).
+pub const SPLIT_MAX: usize = 16;
+/// Narrowest / lowest a split pane gets when a boundary is dragged (logical px).
+const SPLIT_MIN: f64 = 120.0;
+
+/// How a split view arranges its panes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum SplitLayout {
+    /// As square as possible, up to 4 × 4.
+    #[default]
+    Grid,
+    /// Side by side in one row.
+    Columns,
+    /// Stacked top to bottom in one column.
+    Stack,
+}
+
+impl SplitLayout {
+    pub fn parse(s: &str) -> Option<Self> {
+        match s {
+            "grid" => Some(Self::Grid),
+            "columns" => Some(Self::Columns),
+            "stack" => Some(Self::Stack),
+            _ => None,
+        }
+    }
+}
+
+/// Columns × rows for `n` split panes.
+fn split_grid(n: usize, l: SplitLayout) -> (usize, usize) {
+    let n = n.clamp(1, SPLIT_MAX);
+    match l {
+        SplitLayout::Grid => {
+            let cols = ((n as f64).sqrt().ceil() as usize).clamp(1, 4);
+            (cols, n.div_ceil(cols))
+        }
+        SplitLayout::Columns => (n, 1),
+        SplitLayout::Stack => (1, n),
+    }
+}
+
+/// Row `r` / column `c` of pane `i` of `n`, and how many panes that row has (a short last row).
+fn split_pos(i: usize, n: usize, l: SplitLayout) -> (usize, usize, usize) {
+    let (cols, rows) = split_grid(n, l);
+    let r = i / cols;
+    (r, i % cols, if r + 1 == rows { n - cols * (rows - 1) } else { cols })
+}
+
+/// How many panes row `r` of `n` has.
+fn split_row_len(r: usize, n: usize, l: SplitLayout) -> usize {
+    split_pos((r * split_grid(n, l).0).min(n - 1), n, l).2
+}
+
+/// Shares (summing to 1) from dragged sizes `v`, or equal shares when `v` does not fit `len`.
+fn shares(v: Option<&[f64]>, len: usize) -> Vec<f64> {
+    match v {
+        Some(v) if v.len() == len && v.iter().all(|x| *x > 0.0) => {
+            let sum: f64 = v.iter().sum();
+            v.iter().map(|x| x / sum).collect()
+        }
+        _ => vec![1.0 / len as f64; len],
+    }
+}
+
+/// Pane `i` of `n` in the area `x, y, w, h`: (x, y, w, h). Rows take `rows` shares of the
+/// height, each row's panes its `cols` shares of the width (equal until a boundary is dragged).
+/// Panes touch: no visible boundary (the active one has a frame).
+fn split_cell(i: usize, n: usize, l: SplitLayout, (x, y, w, h): (f64, f64, f64, f64), rows: &[f64], cols: &[Vec<f64>]) -> (f64, f64, f64, f64) {
+    let (_, nrows) = split_grid(n, l);
+    let (r, c, in_row) = split_pos(i, n, l);
+    let rf = shares(Some(rows), nrows);
+    let cf = shares(cols.get(r).map(|v| v.as_slice()), in_row);
+    let top: f64 = rf[..r].iter().sum();
+    let left: f64 = cf[..c].iter().sum();
+    let (l, t) = ((x + w * left).round(), (y + h * top).round());
+    let (rr, b) = ((x + w * (left + cf[c])).round(), (y + h * (top + rf[r])).round());
+    (l, t, rr - l, b - t)
+}
+
+/// A split view boundary being dragged (from a pane's grab strip, see content.js `pane`).
+struct SplitDrag {
+    win: u32,
+    /// Vertical boundary in row `r` after column `c`, or the horizontal one after row `r`.
+    vertical: bool,
+    r: usize,
+    c: usize,
+    rows: Vec<f64>,
+    cols: Vec<Vec<f64>>,
+    /// Size of the pane the drag started in, and of the whole split area (logical px).
+    pane: (f64, f64),
+    area: (f64, f64),
+}
+
+/// Takes tab `id` out of its window's split view (which ends when fewer than two remain).
+fn leave_split(s: &mut State, id: u64) {
+    for w in s.wins.values_mut() {
+        if w.split.contains(&id) {
+            w.split.retain(|t| *t != id);
+            w.split_rows.clear();
+            w.split_cols.clear();
+            if w.split.len() < 2 {
+                w.split.clear();
+            }
+        }
+    }
 }
 
 pub struct Inner {
@@ -390,6 +513,7 @@ impl Browser {
             agent_tab: s.agent_tab,
             mcp: self.0.app.try_state::<crate::mcp::McpHub>().map(|h| h.status()).unwrap_or_default(),
             side: self.0.side.lock().unwrap().0,
+            split: s.wins.get(&n).map(|w| w.split.clone()).unwrap_or_default(),
         }
     }
 
@@ -497,12 +621,13 @@ impl Browser {
     /// Places window `n`'s webviews.
     pub fn layout(&self, n: u32) {
         let Some((w, h)) = self.content_size(n) else { return };
-        let (chrome, active, live, palette_open, palette_h) = {
+        let (chrome, active, live, palette_open, palette_h, split) = {
             let s = self.0.state.lock().unwrap();
             let Some(win) = s.wins.get(&n) else { return };
             let live: Vec<u64> = s.tabs.iter().filter(|t| t.live && t.win == n).map(|t| t.id).collect();
-            (win.chrome_height, win.active, live, s.palette_win == Some(n), s.palette_height)
+            (win.chrome_height, win.active, live, s.palette_win == Some(n), s.palette_height, (Self::shown_split(win), win.split_rows.clone(), win.split_cols.clone(), win.split_layout))
         };
+        let (split, split_rows, split_cols, split_layout) = split;
         if let Some(ui) = self.0.app.get_webview(&ui_label(n)) {
             let _ = ui.set_bounds(self.place(n, 0.0, 0.0, w, chrome));
         }
@@ -518,7 +643,11 @@ impl Browser {
         }
         for id in live {
             if let Some(wv) = self.webview(id) {
-                if Some(id) == active {
+                if let Some(i) = split.iter().position(|t| *t == id) {
+                    let (x, y, cw, ch) = split_cell(i, split.len(), split_layout, (sx, chrome, w - sx, h - chrome), &split_rows, &split_cols);
+                    let _ = wv.set_bounds(self.place(n, x, y, cw, ch));
+                    let _ = wv.show();
+                } else if Some(id) == active {
                     let _ = wv.set_bounds(self.place(n, sx, chrome, w - sx, h - chrome));
                     let _ = wv.show();
                 } else {
@@ -531,6 +660,277 @@ impl Browser {
             let ph = palette_h.min(h - PALETTE_TOP - 16.0);
             let _ = p.set_bounds(self.place(n, ((w - pw) / 2.0).round(), PALETTE_TOP, pw, ph));
         }
+    }
+
+    /// The split view on screen in this window: its tabs while one of them is active, else none.
+    fn shown_split(win: &Win) -> Vec<u64> {
+        if win.split.len() >= 2 && win.active.is_some_and(|a| win.split.contains(&a)) { win.split.clone() } else { Vec::new() }
+    }
+
+    /// Where tab `id`'s page sits in window `n` (content-area coordinates): its split pane, or
+    /// the whole page area.
+    fn page_area(&self, n: u32, id: u64) -> Option<(f64, f64, f64, f64)> {
+        let (w, h) = self.content_size(n)?;
+        let (chrome, split, rows, cols, l) = {
+            let s = self.0.state.lock().unwrap();
+            let win = s.wins.get(&n)?;
+            (win.chrome_height, Self::shown_split(win), win.split_rows.clone(), win.split_cols.clone(), win.split_layout)
+        };
+        let sx = self.side_x(w);
+        Some(match split.iter().position(|t| *t == id) {
+            Some(i) => split_cell(i, split.len(), l, (sx, chrome, w - sx, h - chrome), &rows, &cols),
+            None => (sx, chrome, w - sx, h - chrome),
+        })
+    }
+
+    /// Shows these tabs side by side (split view, up to 4 × 4) in the first one's window.
+    pub fn split_tabs(&self, ids: &[u64]) -> Result<(), AppError> {
+        let win = ids.first().and_then(|i| self.tab(*i)).map(|t| t.win).ok_or_else(|| AppError::new("탭이 없습니다.", "split"))?;
+        let (members, focus, cut) = {
+            let mut s = self.0.state.lock().unwrap();
+            let all: Vec<u64> = s.tabs.iter().filter(|t| t.win == win && ids.contains(&t.id)).map(|t| t.id).collect();
+            let cut = all.len() > SPLIT_MAX;
+            let members: Vec<u64> = all.into_iter().take(SPLIT_MAX).collect();
+            if members.len() < 2 {
+                return Err(AppError::new("분할 보기에는 같은 창의 탭이 2개 이상 필요합니다.", "split"));
+            }
+            for m in &members {
+                leave_split(&mut s, *m);
+            }
+            let w = s.wins.get_mut(&win).ok_or_else(|| AppError::new("창이 없습니다.", win))?;
+            w.split = members.clone();
+            w.split_rows.clear();
+            w.split_cols.clear();
+            let focus = w.active.filter(|a| members.contains(a)).unwrap_or(members[0]);
+            (members, focus, cut)
+        };
+        for m in &members {
+            self.ensure_live(*m)?;
+        }
+        self.activate(focus)?;
+        if cut {
+            crate::commands::toast(self, format!("분할 보기는 최대 {SPLIT_MAX}개(4×4)까지입니다. 앞의 {SPLIT_MAX}개 탭만 보여 줍니다."));
+        }
+        Ok(())
+    }
+
+    /// Arranges window `n`'s split view as a grid, side by side or stacked (kept for the window's
+    /// next split view too). Dragged sizes start over.
+    pub fn set_split_layout(&self, n: u32, l: SplitLayout) {
+        let (split, active) = {
+            let mut s = self.0.state.lock().unwrap();
+            let Some(w) = s.wins.get_mut(&n) else { return };
+            w.split_layout = l;
+            w.split_rows.clear();
+            w.split_cols.clear();
+            (Self::shown_split(w), w.active)
+        };
+        self.layout(n);
+        self.sync_panes(&split, &split, active);
+        self.emit();
+    }
+
+    /// Window `n`'s split view arrangement.
+    pub fn split_layout_of(&self, n: u32) -> SplitLayout {
+        self.0.state.lock().unwrap().wins.get(&n).map(|w| w.split_layout).unwrap_or_default()
+    }
+
+    /// Ends window `n`'s split view (its active tab fills the page area again).
+    pub fn unsplit(&self, n: u32) {
+        let old = {
+            let mut s = self.0.state.lock().unwrap();
+            s.split_drag = None;
+            s.wins.get_mut(&n).map(|w| {
+                w.split_rows.clear();
+                w.split_cols.clear();
+                std::mem::take(&mut w.split)
+            }).unwrap_or_default()
+        };
+        self.sync_panes(&old, &[], None);
+        self.layout(n);
+        self.emit();
+    }
+
+    /// A click in a split pane (its page got focus): that pane's tab becomes the active one.
+    pub fn focus_pane(&self, id: u64) {
+        let shown = {
+            let s = self.0.state.lock().unwrap();
+            s.tabs.iter().find(|t| t.id == id).and_then(|t| s.wins.get(&t.win)).is_some_and(|w| w.active != Some(id) && Self::shown_split(w).contains(&id))
+        };
+        if shown {
+            let _ = self.activate(id);
+        }
+    }
+
+    /// Tells the pages of `tabs` their part in the split view `split` (content.js `pane`): the
+    /// active one's frame, grab strips on the left / top edges a pane shares with its neighbour
+    /// (dragging them moves that boundary), see-through scrollbars. Not in `split`: all gone.
+    fn sync_panes(&self, tabs: &[u64], split: &[u64], active: Option<u64>) {
+        let (color, l) = {
+            let s = self.0.state.lock().unwrap();
+            let l = split.first().and_then(|f| s.tabs.iter().find(|t| t.id == *f)).and_then(|t| s.wins.get(&t.win)).map(|w| w.split_layout).unwrap_or_default();
+            (s.pane_color.clone(), l)
+        };
+        let color = if color.is_empty() { "#6d4aff".to_string() } else { color };
+        for id in tabs {
+            let Some(wv) = self.webview(*id) else { continue };
+            let arg = match split.iter().position(|t| t == id) {
+                Some(i) => {
+                    let (r, c, _) = split_pos(i, split.len(), l);
+                    let left = if c > 0 { format!("v:{r}:{}", c - 1) } else { String::new() };
+                    let top = if r > 0 { format!("h:{}:0", r - 1) } else { String::new() };
+                    format!("{{mark:{},left:\"{left}\",top:\"{top}\",color:\"{color}\"}}", Some(*id) == active)
+                }
+                None => "null".into(),
+            };
+            let _ = wv.eval(format!("window.__kite&&window.__kite.pane&&window.__kite.pane({arg})"));
+        }
+    }
+
+    /// A page loaded in a tab: a split pane gets its frame and grab strips back (a new document
+    /// has none).
+    pub fn resync_pane(&self, id: u64) {
+        let found = {
+            let s = self.0.state.lock().unwrap();
+            s.tabs.iter().find(|t| t.id == id).and_then(|t| s.wins.get(&t.win)).map(|w| (Self::shown_split(w), w.active))
+        };
+        if let Some((split, active)) = found
+            && split.contains(&id)
+        {
+            self.sync_panes(&[id], &split, active);
+        }
+    }
+
+    /// A split view boundary dragged from a pane's grab strip (content.js): `start:v:<row>:<col>`
+    /// / `start:h:<row>:0`, `move:<dx>:<dy>` (pointer travel as a share of that pane's size),
+    /// `end`. Only moves boundaries of the sending tab's own split view.
+    pub fn split_drag(&self, id: u64, action: &str) {
+        let mut parts = action.split(':');
+        match parts.next() {
+            Some("start") => {
+                let vertical = parts.next() == Some("v");
+                let (Some(r), Some(c)) = (parts.next().and_then(|x| x.parse::<usize>().ok()), parts.next().and_then(|x| x.parse::<usize>().ok())) else { return };
+                let Some(win) = self.tab(id).map(|t| t.win) else { return };
+                let (Some(pane), Some((w, h))) = (self.page_area(win, id), self.content_size(win)) else { return };
+                let mut s = self.0.state.lock().unwrap();
+                let chrome = s.wins.get(&win).map(|w| w.chrome_height).unwrap_or(DEFAULT_CHROME_HEIGHT);
+                let Some(wn) = s.wins.get(&win) else { return };
+                let split = Self::shown_split(wn);
+                if !split.contains(&id) {
+                    return;
+                }
+                let n = split.len();
+                let l = wn.split_layout;
+                let (_, nrows) = split_grid(n, l);
+                let rows = shares(Some(wn.split_rows.as_slice()), nrows);
+                let cols: Vec<Vec<f64>> = (0..nrows).map(|row| shares(wn.split_cols.get(row).map(|v| v.as_slice()), split_row_len(row, n, l))).collect();
+                let ok = if vertical { cols.get(r).is_some_and(|x| c + 1 < x.len()) } else { r + 1 < nrows };
+                if !ok {
+                    return;
+                }
+                let sx = self.side_x(w);
+                s.split_drag = Some(SplitDrag { win, vertical, r, c, rows, cols, pane: (pane.2, pane.3), area: (w - sx, h - chrome) });
+            }
+            Some("move") => {
+                let (Some(fx), Some(fy)) = (parts.next().and_then(|x| x.parse::<f64>().ok()), parts.next().and_then(|x| x.parse::<f64>().ok())) else { return };
+                let win = {
+                    let mut s = self.0.state.lock().unwrap();
+                    let Some(d) = s.split_drag.as_ref() else { return };
+                    let win = d.win;
+                    // Shares of the two neighbours of the boundary, each kept at least SPLIT_MIN.
+                    let shift = |a: f64, b: f64, px: f64, total: f64| {
+                        let min = (SPLIT_MIN / total).min((a + b) / 2.0);
+                        let na = (a + px / total).clamp(min, a + b - min);
+                        (na, a + b - na)
+                    };
+                    let (mut rows, mut cols) = (d.rows.clone(), d.cols.clone());
+                    if d.vertical {
+                        let row = &mut cols[d.r];
+                        let (a, b) = shift(row[d.c], row[d.c + 1], fx.clamp(-4.0, 4.0) * d.pane.0, d.area.0.max(1.0));
+                        row[d.c] = a;
+                        row[d.c + 1] = b;
+                    } else {
+                        let (a, b) = shift(rows[d.r], rows[d.r + 1], fy.clamp(-4.0, 4.0) * d.pane.1, d.area.1.max(1.0));
+                        rows[d.r] = a;
+                        rows[d.r + 1] = b;
+                    }
+                    let Some(w) = s.wins.get_mut(&win) else { return };
+                    w.split_rows = rows;
+                    w.split_cols = cols;
+                    win
+                };
+                self.layout(win);
+            }
+            _ => self.0.state.lock().unwrap().split_drag = None,
+        }
+    }
+
+    /// The theme's accent color from the tab strip (`--accent`): split view panes take it. Only
+    /// plain color text (`#hex`, `rgb(…)`) is kept.
+    pub fn set_pane_color(&self, color: &str) {
+        let c = color.trim();
+        let ok = c.len() <= 40 && c.chars().all(|ch| ch.is_ascii_alphanumeric() || "#(),. %".contains(ch));
+        if !ok {
+            return;
+        }
+        {
+            let mut s = self.0.state.lock().unwrap();
+            if s.pane_color == c {
+                return;
+            }
+            s.pane_color = c.to_string();
+        }
+        for n in self.wins() {
+            let found = self.0.state.lock().unwrap().wins.get(&n).map(|w| (Self::shown_split(w), w.active));
+            if let Some((split, active)) = found {
+                self.sync_panes(&split, &split, active);
+            }
+        }
+    }
+
+    /// Blue light filter level: 0 off, 1 low, 2 medium, 3 high (setting `blue_filter`).
+    pub fn warm(&self) -> u8 {
+        self.0.store.get("blue_filter").and_then(|v| v.parse::<u8>().ok()).unwrap_or(0).min(3)
+    }
+
+    /// Sets the blue light filter: a warm tint over every page (content.js `warm`) and over
+    /// Kite's own screens (the `warm` event, `src/shared/theme.ts`).
+    pub fn set_warm(&self, level: u8) -> Result<(), AppError> {
+        let level = level.min(3);
+        self.0.store.set("blue_filter", &level.to_string())?;
+        for t in self.tabs() {
+            self.apply_warm(t.id);
+        }
+        let _ = self.0.app.emit("warm", level);
+        Ok(())
+    }
+
+    fn apply_warm(&self, id: u64) {
+        if let Some(wv) = self.webview(id) {
+            let _ = wv.eval(format!("window.__kite&&window.__kite.warm&&window.__kite.warm({})", self.warm()));
+        }
+    }
+
+    /// Tabs for the tab strip's right-click menu (see `menu_tabs`).
+    pub fn set_menu_tabs(&self, tabs: Vec<u64>) {
+        self.0.state.lock().unwrap().menu_tabs = tabs;
+    }
+
+    pub fn set_menu_tab(&self, tab: Option<u64>) {
+        self.0.state.lock().unwrap().menu_tab = tab;
+    }
+
+    pub fn take_menu_tab(&self) -> Option<u64> {
+        self.0.state.lock().unwrap().menu_tab.take()
+    }
+
+    pub fn take_menu_tabs(&self) -> Vec<u64> {
+        std::mem::take(&mut self.0.state.lock().unwrap().menu_tabs)
+    }
+
+    /// Window `n`'s split view tabs (empty when none).
+    pub fn split_of(&self, n: u32) -> Vec<u64> {
+        self.0.state.lock().unwrap().wins.get(&n).map(|w| w.split.clone()).unwrap_or_default()
     }
 
     /// The tab list page of a window started (its `ui_init`).
@@ -619,7 +1019,7 @@ impl Browser {
         };
         let window = wb.build().map_err(err)?;
         step("window");
-        self.0.state.lock().unwrap().wins.insert(n, Win { active: None, chrome_height: DEFAULT_CHROME_HEIGHT, bounds: None });
+        self.0.state.lock().unwrap().wins.insert(n, Win { active: None, chrome_height: DEFAULT_CHROME_HEIGHT, bounds: None, split: Vec::new(), split_rows: Vec::new(), split_cols: Vec::new(), split_layout: SplitLayout::Grid });
         self.note_bounds(n, &window);
         window
             .add_child(
@@ -861,6 +1261,7 @@ impl Browser {
             let Some(pos) = s.tabs.iter().position(|t| t.id == id) else { return Ok(()) };
             let mut t = s.tabs.remove(pos);
             let from = t.win;
+            leave_split(&mut s, id);
             t.win = to;
             s.tabs.push(t);
             let rest: Vec<u64> = s.tabs.iter().filter(|t| t.win == from).map(|t| t.id).collect();
@@ -898,14 +1299,49 @@ impl Browser {
         self.new_tab_in(self.focused(), url, activate)
     }
 
-    /// Adds a tab to window `win`, after its active tab.
+    /// Adds a tab at the end of window `win`'s strip (like Chrome's new tab).
     pub fn new_tab_in(&self, win: u32, url: Option<String>, activate: bool) -> Result<u64, AppError> {
+        self.add_tab(win, url, activate, None)
+    }
+
+    /// Opens a bookmark (bar, side panel, palette): a new tab at the end, or the active tab when
+    /// it is an empty new-tab page (like Chrome, no empty tab left behind).
+    pub fn open_bookmark(&self, url: &str) -> Result<(), AppError> {
+        match self.active().and_then(|a| self.tab(a)).filter(|t| t.url == NEWTAB) {
+            Some(t) => {
+                self.navigate_url(t.id, url)?;
+                if let Some(wv) = self.webview(t.id) {
+                    let _ = wv.set_focus();
+                }
+                Ok(())
+            }
+            None => self.new_tab(Some(url.to_string()), true).map(|_| ()),
+        }
+    }
+
+    /// Adds a tab right after the active one: a link the page opened in a new tab, or a duplicate (like Chrome).
+    pub fn new_tab_next(&self, url: Option<String>) -> Result<u64, AppError> {
+        let win = self.focused();
+        let active = self.0.state.lock().unwrap().wins.get(&win).and_then(|w| w.active);
+        self.add_tab(win, url, true, active)
+    }
+
+    /// A copy of tab `id` (same address) right after it, shown (tab menu "탭 복제", ⌘/Ctrl+Shift+K).
+    pub fn duplicate_tab(&self, id: u64) -> Result<u64, AppError> {
+        let t = self.tab(id).ok_or_else(|| AppError::new("탭이 없습니다.", format!("tab {id}")))?;
+        // The page's address (a failed load shows the address it tried).
+        let url = t.error_url.clone().unwrap_or(t.url);
+        self.add_tab(t.win, (url != NEWTAB).then_some(url), true, Some(id))
+    }
+
+    /// `after`: the tab the new one goes right after; None = the end of the strip.
+    fn add_tab(&self, win: u32, url: Option<String>, activate: bool, after: Option<u64>) -> Result<u64, AppError> {
         let id = self.0.next_id.fetch_add(1, Ordering::SeqCst);
         let shown = url.clone().unwrap_or_else(|| NEWTAB.to_string());
         {
             let mut s = self.0.state.lock().unwrap();
-            let active = s.wins.get(&win).and_then(|w| w.active);
-            let pos = active.and_then(|a| s.tabs.iter().position(|t| t.id == a)).map(|p| p + 1).unwrap_or(s.tabs.len());
+            // `tabs` holds every window's tabs; a window's strip is its tabs in this order, so the end works.
+            let pos = after.and_then(|a| s.tabs.iter().position(|t| t.id == a)).map(|p| p + 1).unwrap_or(s.tabs.len());
             let bookmarked = url.as_deref().is_some_and(|u| self.0.store.is_bookmarked(u));
             s.tabs.insert(
                 pos,
@@ -995,7 +1431,7 @@ impl Browser {
         builder
             // Windows: WebView2 extensions (the setting must match on every webview).
             .browser_extensions_enabled(true)
-            .initialization_script(self.0.content_js.clone())
+            .initialization_script(self.0.content_js.replace("__KITE_WARM__", &self.warm().to_string()))
             .devtools(true)
             .zoom_hotkeys_enabled(false)
             .focused(true)
@@ -1022,7 +1458,13 @@ impl Browser {
                         });
                         b.watch_load(id, generation);
                     }
-                    PageLoadEvent::Finished => b.finish_load(id, payload.url().clone()),
+                    PageLoadEvent::Finished => {
+                        b.finish_load(id, payload.url().clone());
+                        b.resync_pane(id);
+                        // A webview made before the last blue light change starts its pages
+                        // with the old level (its init script): set the current one.
+                        b.apply_warm(id);
+                    }
                 }
             })
             .on_document_title_changed(move |wv, title| {
@@ -1064,7 +1506,7 @@ impl Browser {
                 }
                 allowed
             })
-            .on_new_window(move |u, features| b3.new_window_request(u, features))
+            .on_new_window(move |u, features| b3.new_window_request(id, u, features))
             .on_download(move |wv, event| {
                 // A download is not a failed page load.
                 if let Some(id) = tab_id_of(wv.label()) {
@@ -1074,11 +1516,12 @@ impl Browser {
             })
     }
 
-    /// `target=_blank` and plain `window.open(url)` become a tab next to this one. A real popup
+    /// `target=_blank` and plain `window.open(url)` become a tab next to this one (from Kite's own
+    /// pages — home tiles, the bookmark manager — at the end of the strip, like a bookmark). A real popup
     /// (`window.open(url, name, "width=…")`, or a blank one the page fills in, as login and
     /// payment pages do) gets its own small window linked to the page, so `window.opener`,
     /// `postMessage` and `window.close()` keep working (Chrome does the same).
-    fn new_window_request(&self, u: url::Url, features: tauri::webview::NewWindowFeatures) -> NewWindowResponse<tauri::Wry> {
+    fn new_window_request(&self, opener: u64, u: url::Url, features: tauri::webview::NewWindowFeatures) -> NewWindowResponse<tauri::Wry> {
         let popup = features.size().is_some() || features.position().is_some() || u.as_str() == "about:blank";
         if popup {
             match self.open_popup(&u, features) {
@@ -1092,7 +1535,9 @@ impl Browser {
         let b = self.clone();
         let url = u.to_string();
         tauri::async_runtime::spawn(async move {
-            if let Err(e) = b.new_tab(Some(url), true) {
+            let from_app_page = b.tab(opener).is_some_and(|t| t.url.starts_with("kite://"));
+            let r = if from_app_page { b.new_tab(Some(url), true) } else { b.new_tab_next(Some(url)) };
+            if let Err(e) = r {
                 tracing::warn!(error = %e.detail, "new window as tab failed");
             }
         });
@@ -1141,7 +1586,7 @@ impl Browser {
                 // Popups never open the app's own pages (except the blank start page).
                 !is_app_url(u) || internal_page(u) == Some("newtab")
             })
-            .on_new_window(move |u, f| b2.new_window_request(u, f));
+            .on_new_window(move |u, f| b2.new_window_request(0, u, f)); // 0: a popup, not a tab
         #[cfg(target_os = "macos")]
         let builder = builder.user_agent(safari_ua());
         #[cfg(not(target_os = "macos"))]
@@ -1362,7 +1807,29 @@ impl Browser {
         let _ = wv.eval_with_callback(js, move |r| {
             let icon: String = serde_json::from_str(&r).unwrap_or_default();
             if icon.starts_with("http") || icon.starts_with("data:image/") {
-                b.update(id, |t| t.favicon = Some(icon));
+                b.update(id, |t| t.favicon = Some(icon.clone()));
+                b.keep_favicon(id, icon);
+            }
+        });
+    }
+
+    /// The tab's site is open now: keep its icon (for bookmark lists, which must not fetch icons
+    /// from every bookmarked site). Once a week per site at most.
+    fn keep_favicon(&self, id: u64, icon: String) {
+        const WEEK_MS: i64 = 7 * 24 * 3600 * 1000;
+        let Some(page) = self.tab(id).and_then(|t| url::Url::parse(&t.url).ok()) else { return };
+        if !page.scheme().starts_with("http") {
+            return;
+        }
+        let origin = page.origin().ascii_serialization();
+        if self.0.store.favicon_saved_at(&origin).is_some_and(|t| crate::store::now_ms() - t < WEEK_MS) {
+            return;
+        }
+        let b = self.clone();
+        tauri::async_runtime::spawn_blocking(move || {
+            let data = if icon.starts_with("data:image/") { Some(icon) } else { crate::portal::fetch_image_data_url(&icon, 64 * 1024) };
+            if let Some(d) = data.filter(|d| d.len() < 120 * 1024) {
+                let _ = b.0.store.favicon_save(&origin, &d);
             }
         });
     }
@@ -1448,7 +1915,8 @@ impl Browser {
         let chrome = self.0.state.lock().unwrap().wins.get(&win).map(|w| w.chrome_height).unwrap_or(DEFAULT_CHROME_HEIGHT);
         let _ = c.emit_to(cover_label(win), "cover", image);
         let sx = self.side_x(cw);
-        let _ = c.set_bounds(self.place(win, sx, chrome, cw - sx, h - chrome));
+        let (x, y, aw, ah) = self.0.reviving.lock().unwrap().get(&win).copied().and_then(|id| self.page_area(win, id)).unwrap_or((sx, chrome, cw - sx, h - chrome));
+        let _ = c.set_bounds(self.place(win, x, y, aw, ah));
         let _ = c.reparent(&w);
         #[cfg(windows)]
         crate::platform::bring_to_front(&c);
@@ -1519,16 +1987,27 @@ impl Browser {
             return Err(AppError::new("탭이 없습니다.", format!("tab {id}")));
         }
         let wv = self.ensure_live(id)?;
-        let (win, other_window, palette_here) = {
+        let (win, other_window, palette_here, split) = {
             let mut s = self.0.state.lock().unwrap();
             let win = s.tabs.iter().find(|t| t.id == id).map(|t| t.win).unwrap_or(1);
+            let mut split = Vec::new();
             if let Some(w) = s.wins.get_mut(&win) {
                 w.active = Some(id);
+                split = w.split.clone();
             }
             let other = s.focused != win;
             s.focused = win;
-            (win, other, s.palette_win == Some(win))
+            (win, other, s.palette_win == Some(win), split)
         };
+        // Split view: every pane has a page; the active one is outlined.
+        let in_split = split.contains(&id);
+        if in_split {
+            for m in split.iter().filter(|m| **m != id) {
+                let _ = self.ensure_live(*m);
+            }
+        }
+        // A tab out of the split (or left alone when it ended) loses its frame.
+        if in_split { self.sync_panes(&split, &split, Some(id)) } else { self.sync_panes(&[id], &[], None) }
         self.layout(win);
         // Leaving a tab that is still being revived: its stand-in goes too.
         let reviving = self.0.reviving.lock().unwrap().get(&win).copied();
@@ -1565,9 +2044,12 @@ impl Browser {
             if s.agent_tab == Some(id) {
                 s.agent_tab = None;
             }
+            // A pane of a split view: another pane takes its place.
+            let pane = s.wins.get(&win).and_then(|w| w.split.iter().copied().find(|t| *t != id).filter(|_| w.split.contains(&id)));
+            leave_split(&mut s, id);
             let rest: Vec<u64> = s.tabs.iter().filter(|t| t.win == win).map(|t| t.id).collect();
             let before = s.tabs[..pos].iter().filter(|t| t.win == win).count();
-            let next = rest.get(before).or_else(|| rest.get(before.wrapping_sub(1))).copied();
+            let next = pane.or_else(|| rest.get(before).or_else(|| rest.get(before.wrapping_sub(1))).copied());
             let was_active = s.wins.get(&win).and_then(|w| w.active) == Some(id);
             if was_active && let Some(w) = s.wins.get_mut(&win) {
                 w.active = None;
@@ -2148,6 +2630,49 @@ fn event_name(e: &tauri::WindowEvent) -> &'static str {
         tauri::WindowEvent::CloseRequested { .. } => "CloseRequested",
         tauri::WindowEvent::Destroyed => "Destroyed",
         _ => "other",
+    }
+}
+
+#[cfg(test)]
+mod split_tests {
+    use super::*;
+
+    #[test]
+    fn grid_shapes() {
+        assert_eq!(split_grid(2, SplitLayout::Grid), (2, 1));
+        assert_eq!(split_grid(3, SplitLayout::Grid), (2, 2));
+        assert_eq!(split_grid(4, SplitLayout::Grid), (2, 2));
+        assert_eq!(split_grid(5, SplitLayout::Grid), (3, 2));
+        assert_eq!(split_grid(9, SplitLayout::Grid), (3, 3));
+        assert_eq!(split_grid(10, SplitLayout::Grid), (4, 3));
+        assert_eq!(split_grid(16, SplitLayout::Grid), (4, 4));
+        assert_eq!(split_grid(40, SplitLayout::Grid), (4, 4));
+        assert_eq!(split_grid(3, SplitLayout::Columns), (3, 1));
+        assert_eq!(split_grid(3, SplitLayout::Stack), (1, 3));
+    }
+
+    #[test]
+    fn cells_fill_the_area() {
+        // 3 panes: two on top, one across the bottom.
+        let cell = |i, n| split_cell(i, n, SplitLayout::Grid, (0.0, 0.0, 800.0, 600.0), &[], &[]);
+        assert_eq!(cell(0, 3), (0.0, 0.0, 400.0, 300.0));
+        assert_eq!(cell(1, 3), (400.0, 0.0, 400.0, 300.0));
+        assert_eq!(cell(2, 3), (0.0, 300.0, 800.0, 300.0));
+        for i in 0..16 {
+            let (x, y, w, h) = split_cell(i, 16, SplitLayout::Grid, (10.0, 20.0, 1000.0, 700.0), &[], &[]);
+            assert!(x >= 10.0 && y >= 20.0 && x + w <= 1010.0 && y + h <= 720.0 && w >= 250.0 && h >= 175.0);
+        }
+        // dragged: top row 3/4 of the height, its left pane 1/4 of the width
+        let rows = [3.0, 1.0];
+        let cols = [vec![1.0, 3.0]];
+        assert_eq!(split_cell(0, 3, SplitLayout::Grid, (0.0, 0.0, 800.0, 600.0), &rows, &cols), (0.0, 0.0, 200.0, 450.0));
+        assert_eq!(split_cell(1, 3, SplitLayout::Grid, (0.0, 0.0, 800.0, 600.0), &rows, &cols), (200.0, 0.0, 600.0, 450.0));
+        assert_eq!(split_cell(2, 3, SplitLayout::Grid, (0.0, 0.0, 800.0, 600.0), &rows, &cols), (0.0, 450.0, 800.0, 150.0));
+        // stacked: full width, one above the other
+        let st = |i| split_cell(i, 3, SplitLayout::Stack, (0.0, 0.0, 800.0, 600.0), &[], &[]);
+        assert_eq!((st(0), st(1), st(2)), ((0.0, 0.0, 800.0, 200.0), (0.0, 200.0, 800.0, 200.0), (0.0, 400.0, 800.0, 200.0)));
+        let co = |i| split_cell(i, 4, SplitLayout::Columns, (0.0, 0.0, 800.0, 600.0), &[], &[]);
+        assert_eq!((co(0), co(3)), ((0.0, 0.0, 200.0, 600.0), (600.0, 0.0, 200.0, 600.0)));
     }
 }
 

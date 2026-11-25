@@ -76,6 +76,32 @@ impl Store {
         Self::with(Connection::open(path).map_err(db_err)?)
     }
 
+    /// Saved site icon (data URL) per origin, taken while the site was open in a tab. Kite never
+    /// fetches icons for bookmarks or history on its own: that would contact every site in them.
+    pub fn favicon_save(&self, origin: &str, data: &str) -> Result<(), AppError> {
+        self.db
+            .lock()
+            .unwrap()
+            .execute("INSERT INTO favicons(origin, data, saved) VALUES(?1, ?2, ?3) ON CONFLICT(origin) DO UPDATE SET data=?2, saved=?3", rusqlite::params![origin, data, now_ms()])
+            .map(|_| ())
+            .map_err(db_err)
+    }
+
+    /// When the icon of `origin` was saved (unix ms), if it was.
+    pub fn favicon_saved_at(&self, origin: &str) -> Option<i64> {
+        self.db.lock().unwrap().query_row("SELECT saved FROM favicons WHERE origin=?1", [origin], |r| r.get(0)).ok()
+    }
+
+    pub fn favicons(&self, origins: &[String]) -> std::collections::HashMap<String, String> {
+        let db = self.db.lock().unwrap();
+        let Ok(mut st) = db.prepare_cached("SELECT data FROM favicons WHERE origin=?1") else { return Default::default() };
+        origins.iter().filter_map(|o| st.query_row([o], |r| r.get::<_, String>(0)).ok().map(|d| (o.clone(), d))).collect()
+    }
+
+    pub fn favicons_clear(&self) -> Result<(), AppError> {
+        self.db.lock().unwrap().execute("DELETE FROM favicons", []).map(|_| ()).map_err(db_err)
+    }
+
     #[cfg(test)]
     pub fn memory() -> Result<Self, AppError> {
         Self::with(Connection::open_in_memory().map_err(db_err)?)
@@ -96,7 +122,8 @@ impl Store {
                id INTEGER PRIMARY KEY, origin TEXT NOT NULL, username TEXT NOT NULL, secret BLOB NOT NULL,
                created INTEGER NOT NULL, last_used INTEGER NOT NULL, UNIQUE(origin, username));
              CREATE TABLE IF NOT EXISTS password_never(origin TEXT PRIMARY KEY);
-             CREATE TABLE IF NOT EXISTS bookmark_folders(path TEXT PRIMARY KEY);",
+             CREATE TABLE IF NOT EXISTS bookmark_folders(path TEXT PRIMARY KEY);
+             CREATE TABLE IF NOT EXISTS favicons(origin TEXT PRIMARY KEY, data TEXT NOT NULL, saved INTEGER NOT NULL);",
         )
         .map_err(db_err)?;
         let s = Self { db: Mutex::new(c) };
@@ -554,6 +581,18 @@ impl Store {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn favicons_only_what_was_saved() {
+        let s = Store::memory().unwrap();
+        assert!(s.favicons(&["https://a.example".into()]).is_empty());
+        s.favicon_save("https://a.example", "data:image/png;base64,AAAA").unwrap();
+        let got = s.favicons(&["https://a.example".into(), "https://never.example".into()]);
+        assert_eq!(got.len(), 1);
+        assert!(s.favicon_saved_at("https://a.example").is_some());
+        s.favicons_clear().unwrap();
+        assert!(s.favicons(&["https://a.example".into()]).is_empty());
+    }
 
     #[test]
     fn bookmarks_toggle_and_search() {

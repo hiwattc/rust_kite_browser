@@ -39,7 +39,19 @@ export function applyTheme(id: string) {
 }
 
 /** Last theme at once (no flash of the default), then the saved one, then live changes. */
+/** Blue light filter (0..3) over Kite's own screens; tab pages get it from content.js instead. */
+function applyWarm(n: number) {
+  if (n > 0) document.documentElement.dataset.warm = String(Math.min(3, n));
+  else delete document.documentElement.dataset.warm;
+}
+
 export function initTheme() {
+  if (!("__kite" in window)) {
+    invoke<number>("warm_get").then(applyWarm, () => {});
+    getCurrentWebview()
+      .listen<number>("warm", (e) => applyWarm(e.payload))
+      .catch(() => {});
+  }
   try {
     const last = localStorage.getItem(KEY);
     if (last) applyTheme(last);

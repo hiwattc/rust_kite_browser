@@ -147,3 +147,13 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 input { font: inherit; color: inherit; }
 svg { display: block; }
 .icon { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+/* Blue light filter (right click on the toolbar): a warm tint over Kite's own screens, the same
+   as content.js puts over pages. */
+:root[data-warm]::after {
+  content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 2147483645;
+  background: rgb(255, 147, 41); mix-blend-mode: multiply;
+}
+:root[data-warm="1"]::after { opacity: .12; }
+:root[data-warm="2"]::after { opacity: .22; }
+:root[data-warm="3"]::after { opacity: .34; }

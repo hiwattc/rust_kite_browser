@@ -7,6 +7,7 @@ import { icons } from "../shared/icons";
 import { initTheme } from "../shared/theme";
 import { NEWTAB, type BrowserState, type Init, type Tab } from "../shared/types";
 import "./side.css";
+import { loadIcons, savedIcon } from "../shared/favicons";
 
 initTheme();
 const wv = getCurrentWebview();
@@ -30,7 +31,7 @@ let mode: Mode = (() => {
     return "tabs";
   }
 })();
-let state: BrowserState = { tabs: [], active: null, agentTab: null, mcp: { running: false, port: 0, url: "" }, side: true };
+let state: BrowserState = { tabs: [], active: null, agentTab: null, mcp: { running: false, port: 0, url: "" }, side: true, split: [] };
 let bookmarks: Bookmark[] = [];
 let folderOrder: string[] = [];
 let bookmarksLoaded = false;
@@ -67,14 +68,8 @@ const host = (u: string) => {
   }
 };
 const titleOf = (t: Tab) => (t.url === NEWTAB ? "새 탭" : t.title || host(t.url));
-const favicon = (u: string) => {
-  try {
-    const x = new URL(u);
-    return /^https?:$/.test(x.protocol) ? `${x.origin}/favicon.ico` : "";
-  } catch {
-    return "";
-  }
-};
+/** Only icons kept while the site was open (never fetched from the bookmarked site). */
+const favicon = savedIcon;
 
 function words() {
   return query.toLowerCase().split(/\s+/).filter(Boolean);
@@ -99,16 +94,21 @@ function render() {
   else renderBookmarks();
 }
 
+/** What the tab rows were last drawn from (see renderTabs). */
+let lastTabsHtml = "";
+
 function renderTabs() {
   const tabs = query ? state.tabs.filter((t) => matches(`${titleOf(t)} ${t.url}`)) : state.tabs;
   rows = tabs.map((tab) => ({ kind: "tab", tab }));
   if (sel >= rows.length) sel = rows.length - 1;
-  list.innerHTML =
+  // The rows' contents without the active / keyboard-selected marks: when only those changed
+  // (a tab was picked), the rows stay and just their classes change — rewriting them recreated
+  // every favicon image and the list flickered.
+  const html =
     tabs
       .map((t, i) => {
         const icon = t.loading ? `<span class="spin"></span>` : t.favicon ? `<img src="${esc(t.favicon)}" alt="" draggable="false" />` : icons.globe;
-        const cls = ["item", t.id === state.active ? "on" : "", i === sel ? "sel" : ""].join(" ");
-        return `<div class="${cls}" data-i="${i}" data-id="${t.id}" title="${esc(titleOf(t))}\n${esc(t.url)}">
+        return `<div class="item" data-i="${i}" data-id="${t.id}" title="${esc(titleOf(t))}\n${esc(t.url)}">
           <span class="ic">${icon}</span>
           <span class="txt"><b>${mark(titleOf(t))}</b><small>${mark(host(t.url))}</small></span>
           ${t.id === state.agentTab ? `<span class="agent" title="AI 에이전트가 쓰는 탭">${icons.bot}</span>` : ""}
@@ -116,6 +116,15 @@ function renderTabs() {
         </div>`;
       })
       .join("") || `<div class="empty">${query ? "일치하는 탭이 없습니다" : "탭이 없습니다"}</div>`;
+  if (html !== lastTabsHtml || list.dataset.view !== "tabs") {
+    list.innerHTML = html;
+    lastTabsHtml = html;
+    list.dataset.view = "tabs";
+  }
+  list.querySelectorAll<HTMLElement>(".item").forEach((el, i) => {
+    el.classList.toggle("on", Number(el.dataset.id) === state.active);
+    el.classList.toggle("sel", i === sel);
+  });
   list.classList.toggle("filtered", !!query);
   if (state.active !== lastActive) {
     lastActive = state.active;
@@ -125,6 +134,7 @@ function renderTabs() {
 
 /** Bookmarks grouped by folder: bookmark bar first, then the bookmark manager's folder order. */
 function renderBookmarks() {
+  list.dataset.view = "bookmarks"; // the tab rows are gone (renderTabs draws them again)
   if (!bookmarksLoaded) {
     list.innerHTML = `<div class="empty"><span class="spin"></span></div>`;
     return;
@@ -171,6 +181,7 @@ async function loadBookmarks() {
     /* keep what we had */
   }
   render();
+  if (await loadIcons(bookmarks.map((b) => b.url))) render();
 }
 
 function setMode(m: Mode) {
@@ -196,8 +207,8 @@ document.querySelectorAll<HTMLElement>(".seg button").forEach((b) => (b.onclick 
 function openRow(r: Row | undefined, newTab: boolean) {
   if (!r) return;
   if (r.kind === "tab") invoke("tab_activate", { id: r.tab.id });
-  else if (newTab || state.active === null) invoke("tab_new", { url: r.bm.url });
-  else invoke("navigate", { id: state.active, input: r.bm.url });
+  else if (newTab) invoke("tab_new", { url: r.bm.url });
+  else invoke("bookmark_open", { url: r.bm.url });
 }
 
 list.addEventListener("mousedown", (e) => {

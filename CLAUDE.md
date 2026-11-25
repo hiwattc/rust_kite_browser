@@ -17,6 +17,8 @@ Rust 브라우저. Tauri v2 + OS 웹뷰(Windows WebView2 / macOS WKWebView) + Vi
 - `src-tauri/src/meet.rs` — 영상회의 서버(호스트 Kite가 TCP로 열고 UPnP로 공유기 포트 개방, 초대 코드 키로 프레임 암호화, 참가 요청·수락·시그널링 중계). 페이지(`src/meet`)는 네트워크를 직접 쓰지 않고 `meet_*` 명령과 `meet` 이벤트만 씀.
 - `src-tauri/src/portal.rs` + `src/home` — `kite://home` 개인 포털. 페이지가 레이아웃·편집을 하고, 데이터(워크스페이스 → 섹션(`apps`|`todo`, 12칸 격자 `w`×`h`) JSON 하나, version 2; 예전 v1은 `normalize`가 변환)는 store kv `portal`에 저장. 사이트 아이콘은 Rust가 받아 data URL로(apple-touch-icon 우선). 내보내기/불러오기는 파일 대화상자.
 - `src-tauri/src/downloads.rs` + `src/downloads` — 다운로드 진행률·기록·`kite://downloads`. Tauri는 Requested/Finished만 줘서, macOS는 `platform::mac_download`가 wry 다운로드 델리게이트의 destination 메서드를 감싸 `WKDownload`(retain, 메인 스레드에서만 접근)와 expectedContentLength를 넘김 → 진행률·취소. 취소한 다운로드는 WebKit이 알려 주지 않아 직접 종료 처리. Windows는 파일 크기로만.
+- 분할 보기(split view): 창(`Win`)마다 `split`(탭 2~16개, 최대 4×4). 그중 한 탭이 활성이면 `layout`이 `split_cell` 격자로 나란히 배치. 탭줄에서 Ctrl/⌘·Shift+클릭으로 고르고 오른쪽 클릭 메뉴(`ui_menu`의 `tabs` → `menu_tabs` → `split_view`/`unsplit` 동작). 칸을 클릭하면 `content.js`가 focus 때 `pane`을 보내 그 탭이 활성(`focus_pane`), `sync_panes`가 각 칸 페이지에 `content.js`의 `pane`을 호출(활성 칸 테두리, 왼쪽/위 경계 잡는 띠, 투명 스크롤바). 경계 드래그는 `split` 이벤트 → `split_drag`가 행 높이·행별 칸 너비 비율(`split_rows`/`split_cols`)을 바꿈. 칸 사이 간격 없음. 배치 `SplitLayout`(격자/좌우/위아래 스택)은 창마다, 탭 메뉴 "분할 배치" 하위 메뉴(`split_grid`/`split_columns`/`split_stack`). MCP `browser_tabs` action `split`/`unsplit`. 세션에는 저장 안 함.
+- 블루라이트 차단: 설정 `blue_filter`(0~3), 상단 오른쪽 클릭 메뉴(`warm_0`~`warm_3`). 탭 페이지는 `content.js`의 `warm`(따뜻한 색 multiply 덮개, 웹뷰 만들 때 `__KITE_WARM__` 자리에 값을 넣고 바뀌면 eval·로드 끝날 때 다시 적용), Kite 자체 화면은 `theme.ts`가 `warm` 이벤트로 `:root[data-warm]::after`.
 - `src-tauri/src/pages.rs` — 내부 페이지(`kite://settings`, `kite://bookmarks`)용 명령.
 - `src/index`, `src/palette` — 탭줄/툴바·북마크 바, 팔레트(각자 웹뷰). `src/newtab`, `src/settings`, `src/bookmarks` — 탭 안에 뜨는 내부 페이지(`src/shared/page.ts` 공통).
 
@@ -34,6 +36,7 @@ Rust 브라우저. Tauri v2 + OS 웹뷰(Windows WebView2 / macOS WKWebView) + Vi
 - `cargo fmt`를 돌리지 않는다(rustfmt 설정이 없고 기존 코드는 긴 줄 스타일이라 전체가 바뀜).
 - Windows 창은 제목 표시줄 없음(`decorations(false)` + 그림자): 탭줄(`ui` 웹뷰)이 최소화·최대화·닫기 버튼과 이동 영역(`data-tauri-drag-region`), 위쪽 가장자리 크기 조절(`startResizeDragging`)을 맡고, 좌·우·아래 크기 조절은 창 그림자가 함. Tauri 기본 크기 조절 스크립트는 웹뷰 하나짜리 창에만 붙어서 직접 처리.
 - 전역 단축키 기본값: macOS `Alt+Space`, Windows `F9`. 런처 창은 메인 스레드 콜백 안에서 만들지 않는다(백그라운드 작업에서 build).
+- 북마크·기록 같은 주소 목록에서 사이트의 아이콘(`https://사이트/favicon.ico`)을 직접 불러오지 않는다(목록을 여는 것만으로 모든 사이트에 DNS 조회·접속 → 보안관제에 잡힘). 아이콘은 탭에서 실제로 그 사이트를 열었을 때 `keep_favicon`이 DB(`favicons` 테이블)에 저장하고, 목록은 `src/shared/favicons.ts`(`favicons` 명령)로 저장된 것만 쓴다.
 - `gen`은 edition 2024 예약어. Windows 전용/맥 전용 코드는 `platform.rs`에 cfg로 모으고 양쪽 모두 컴파일 확인.
 - 프론트에서 이벤트는 `getCurrentWebview().listen` (전역 `listen`은 다른 창으로 보낸 이벤트도 받음). 창마다 다른 이벤트는 `ui_label(n)`로 `emit_to`.
 - UI 문자열은 한국어. 색·크기는 `src/styles/base.css` 토큰을 쓴다.

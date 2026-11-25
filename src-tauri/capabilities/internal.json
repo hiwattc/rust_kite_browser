@@ -53,6 +53,7 @@
     "allow-download-action",
     "allow-downloads-clear",
     "allow-downloads-open-dir",
-    "allow-downloads-pick-dir"
+    "allow-downloads-pick-dir",
+    "allow-favicons"
   ]
 }

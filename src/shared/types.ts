@@ -47,6 +47,8 @@ export interface BrowserState {
   mcp: McpStatus;
   /** The vertical tab list on the left is open. */
   side: boolean;
+  /** Tabs shown side by side (split view), empty when none. */
+  split: number[];
 }
 
 export interface BarItem {

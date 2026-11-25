@@ -170,6 +170,38 @@ fn fetch_icon(page: &str) -> Option<String> {
     None
 }
 
+/// One image (an icon the open page names) as a data URL, at most `max` bytes.
+pub fn fetch_image_data_url(url: &str, max: u64) -> Option<String> {
+    use base64::Engine;
+    let u = url::Url::parse(url).ok()?;
+    if !u.scheme().starts_with("http") {
+        return None;
+    }
+    let mut resp = agent().get(u.as_str()).call().ok()?;
+    let mime = resp.headers().get("content-type").and_then(|v| v.to_str().ok()).unwrap_or("").split(';').next().unwrap_or("").trim().to_string();
+    let bytes = resp.body_mut().with_config().limit(max).read_to_vec().ok()?;
+    let mime = if mime.starts_with("image/") {
+        mime
+    } else if u.path().ends_with(".ico") {
+        "image/x-icon".into()
+    } else if u.path().ends_with(".png") {
+        "image/png".into()
+    } else if u.path().ends_with(".svg") {
+        "image/svg+xml".into()
+    } else {
+        return None;
+    };
+    (bytes.len() >= 32).then(|| format!("data:{mime};base64,{}", base64::engine::general_purpose::STANDARD.encode(bytes)))
+}
+
+/// Saved icons of these sites (`origin` → data URL). Only what was kept while each site was open;
+/// never contacts a site.
+#[tauri::command]
+pub async fn favicons(b: State<'_, Browser>, origins: Vec<String>) -> Result<std::collections::HashMap<String, String>, AppError> {
+    let origins: Vec<String> = origins.into_iter().take(2000).collect();
+    Ok(b.0.store.favicons(&origins))
+}
+
 /// The site's own icon (largest it offers) as a data URL, or `None`.
 #[tauri::command]
 pub async fn portal_icon(url: String) -> Result<Option<String>, AppError> {

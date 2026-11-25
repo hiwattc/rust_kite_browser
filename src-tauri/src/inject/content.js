@@ -917,6 +917,141 @@
     return /^https?:$/.test(location.protocol) ? location.origin + "/favicon.ico" : "";
   };
   kite.snapshot = snapshot;
+  // ---------- blue light filter ----------
+  // A warm tint over the page (multiply: takes out blue, keeps the page usable; never in the way
+  // of clicks). Level 0..3 from Kite: in this script at creation, then `warm(n)` on change.
+  var WARM = [0, 0.12, 0.22, 0.34];
+  kite.warm = function (n) {
+    if (window.top !== window) return;
+    var root = document.documentElement;
+    if (!root) return;
+    var el = document.getElementById("__kite_warm");
+    var a = WARM[n | 0] || 0;
+    if (!a) {
+      if (el) el.remove();
+      return;
+    }
+    if (!el) {
+      el = document.createElement("div");
+      el.id = "__kite_warm";
+      el.setAttribute("aria-hidden", "true");
+      el.style.cssText = "position:fixed;inset:0;pointer-events:none;z-index:2147483645;background:rgb(255,147,41);mix-blend-mode:multiply;transition:opacity .25s;";
+      root.appendChild(el);
+    }
+    el.style.opacity = String(a);
+  };
+  (function startWarm(n) {
+    if (!n) return;
+    if (document.documentElement) kite.warm(n);
+    else document.addEventListener("readystatechange", function once() {
+      if (!document.documentElement) return;
+      document.removeEventListener("readystatechange", once);
+      kite.warm(n);
+    });
+  })(Number("__KITE_WARM__") || 0);
+
+  // ---------- split view ----------
+  // A click in a page that is one pane of a split view (it gets focus): Rust makes its tab the
+  // active one (ignored when the tab is not in a split view). Frames report too: a click in an
+  // iframe focuses the frame, not this window.
+  window.addEventListener("focus", function () { send("pane"); });
+  // Kite's split view tells each pane its part (null: not a pane any more):
+  // { mark: active pane (purple frame), left / top: boundary ids ("v:<row>:<col>", "h:<row>:0")
+  // of the edges this pane shares with its neighbour, "" for none }. Those edges get a see-through
+  // grab strip; dragging it reports the pointer travel (as a share of this pane's size, which
+  // stays right while the pane resizes) and Rust moves the boundary. Scrollbars turn see-through
+  // too. Only the left/top edges: the right and bottom ones hold the page's scrollbars.
+  var paneGrips = [];
+  var paneKey = "";
+  kite.pane = function (o) {
+    if (window.top !== window) return;
+    var root = document.documentElement;
+    if (!root) return;
+    // Theme accent from Kite (the tab strip's split line); only plain color text.
+    var color = o && /^[#(),. %a-zA-Z0-9]{1,40}$/.test(o.color || "") ? o.color : "#6d4aff";
+    var frame = document.getElementById("__kite_pane");
+    if (o && o.mark && !frame) {
+      frame = document.createElement("div");
+      frame.id = "__kite_pane";
+      frame.setAttribute("aria-hidden", "true");
+      frame.style.cssText = "position:fixed;inset:0;border:2px solid;pointer-events:none;z-index:2147483646;box-sizing:border-box;";
+      root.appendChild(frame);
+    } else if (!(o && o.mark) && frame) frame.remove();
+    if (frame && o && o.mark) frame.style.borderColor = color;
+    // Same edges (a click in this pane just made it the active one, maybe mid-drag): keep them.
+    var key = o ? (o.left || "") + "|" + (o.top || "") + "|" + color : "";
+    var keep = o && key === paneKey && paneGrips.every(function (g) { return g.isConnected; });
+    if (!keep) {
+      paneGrips.forEach(function (g) { g.remove(); });
+      paneGrips = [];
+    }
+    paneKey = key;
+    var css = document.getElementById("__kite_pane_css");
+    if (!o) {
+      if (css) css.remove();
+      return;
+    }
+    if (!css) {
+      css = document.createElement("style");
+      css.id = "__kite_pane_css";
+      css.textContent =
+        "html{scrollbar-width:thin;scrollbar-color:rgba(128,128,128,.4) transparent}" +
+        "::-webkit-scrollbar{width:8px;height:8px;background:transparent}" +
+        "::-webkit-scrollbar-track,::-webkit-scrollbar-corner{background:transparent}" +
+        "::-webkit-scrollbar-thumb{background:rgba(128,128,128,.4);border-radius:4px}";
+      root.appendChild(css);
+    }
+    if (keep) return;
+    [["left", o.left], ["top", o.top]].forEach(function (e) {
+      if (!e[1]) return;
+      var g = document.createElement("div");
+      var v = e[0] === "left";
+      g.setAttribute("aria-hidden", "true");
+      // The boundary: a 2px line in the accent along the edge (the strip's split line color),
+      // inside a 6px strip that takes the drag.
+      var line = v ? "linear-gradient(to right," + color + " 2px,transparent 2px)" : "linear-gradient(to bottom," + color + " 2px,transparent 2px)";
+      g.style.cssText = "position:fixed;z-index:2147483647;transition:opacity .12s;opacity:.75;" + (v ? "left:0;top:0;bottom:0;width:6px;cursor:col-resize;" : "left:0;right:0;top:0;height:6px;cursor:row-resize;");
+      g.style.background = line;
+      var drag = null;
+      var queued = false;
+      var hot = function (on) {
+        g.style.background = on ? color : line;
+        g.style.opacity = on ? ".55" : ".75";
+      };
+      g.addEventListener("pointerenter", function () { hot(true); });
+      g.addEventListener("pointerleave", function () { if (!drag) hot(false); });
+      g.addEventListener("pointerdown", function (ev) {
+        if (ev.button !== 0) return;
+        ev.preventDefault();
+        ev.stopPropagation();
+        try { g.setPointerCapture(ev.pointerId); } catch (x) {}
+        drag = { x: ev.screenX, y: ev.screenY, w: window.innerWidth || 1, h: window.innerHeight || 1, nx: 0, ny: 0 };
+        send("split", "start:" + e[1]);
+      });
+      g.addEventListener("pointermove", function (ev) {
+        if (!drag) return;
+        drag.nx = (ev.screenX - drag.x) / drag.w;
+        drag.ny = (ev.screenY - drag.y) / drag.h;
+        if (queued) return;
+        queued = true;
+        requestAnimationFrame(function () {
+          queued = false;
+          if (drag) send("split", "move:" + drag.nx.toFixed(4) + ":" + drag.ny.toFixed(4));
+        });
+      });
+      var end = function () {
+        if (!drag) return;
+        drag = null;
+        hot(false);
+        send("split", "end");
+      };
+      g.addEventListener("pointerup", end);
+      g.addEventListener("pointercancel", end);
+      g.addEventListener("lostpointercapture", end);
+      root.appendChild(g);
+      paneGrips.push(g);
+    });
+  };
   kite.keys = function () { return { keys: KEYS, last: lastCombo }; };
   kite.describe = describe;
   kite.resolve = resolve;

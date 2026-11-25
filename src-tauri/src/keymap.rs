@@ -51,6 +51,7 @@ pub fn bindings() -> Vec<Binding> {
         (format!("{m}+KeyN"), "new_window"),
         (format!("{m}+KeyW"), "close_tab"),
         (format!("{m}+Shift+KeyT"), "reopen_tab"),
+        (format!("{m}+Shift+KeyK"), "duplicate_tab"),
         (format!("{m}+KeyL"), "focus_address"),
         (format!("{m}+KeyR"), "reload"),
         (format!("{m}+Shift+KeyR"), "hard_reload"),

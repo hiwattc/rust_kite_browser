@@ -5,7 +5,7 @@ use serde::Serialize;
 use serde_json::{Value, json};
 use tauri::{AppHandle, Emitter, Manager, State, Webview};
 
-use crate::browser::{Browser, NEWTAB, tab_id_of, win_of_label};
+use crate::browser::{Browser, tab_id_of, win_of_label};
 use crate::error::AppError;
 use crate::mcp::McpHub;
 use crate::palette;
@@ -142,8 +142,31 @@ pub async fn run_action(app: &AppHandle, action: &str) -> Result<(), AppError> {
         "close_tab" => b.close_tab(active(&b)?)?,
         "reopen_tab" => b.reopen_closed()?,
         "duplicate_tab" => {
-            let t = b.tab(active(&b)?).ok_or_else(|| AppError::new("탭이 없습니다.", ""))?;
-            b.new_tab(if t.url == NEWTAB { None } else { Some(t.url) }, true)?;
+            b.duplicate_tab(active(&b)?)?;
+        }
+        // The tab menu's "탭 복제": the tab right-clicked.
+        "duplicate_menu_tab" => {
+            let id = match b.take_menu_tab() {
+                Some(id) => id,
+                None => active(&b)?,
+            };
+            b.duplicate_tab(id)?;
+        }
+        // The tab strip's right-click menu: the tabs it was opened for side by side.
+        "split_view" => {
+            let tabs = b.take_menu_tabs();
+            b.split_tabs(&tabs)?;
+        }
+        "unsplit" => b.unsplit(b.focused()),
+        "warm_0" | "warm_1" | "warm_2" | "warm_3" => {
+            let level: u8 = action[5..].parse().unwrap_or(0);
+            b.set_warm(level)?;
+            toast(&b, if level == 0 { "블루라이트 차단을 껐습니다.".to_string() } else { format!("블루라이트 차단: {}", ["", "약", "중", "강"][level as usize]) });
+        }
+        "split_grid" | "split_columns" | "split_stack" => {
+            if let Some(l) = crate::browser::SplitLayout::parse(&action[6..]) {
+                b.set_split_layout(b.focused(), l);
+            }
         }
         "close_other_tabs" => {
             let keep = active(&b)?;
@@ -415,6 +438,10 @@ pub async fn content_event(app: AppHandle, webview: Webview, kind: String, actio
             }
         }
         "url" => b.refresh_url(id),
+        // The page got focus (a click in it): in a split view its pane becomes the active tab.
+        "pane" => b.focus_pane(id),
+        // A split view boundary dragged in this pane's grab strip.
+        "split" => b.split_drag(id, &action),
         "password" => crate::passwords::on_event(&app, id, &action).await,
         _ => {}
     }
@@ -427,6 +454,25 @@ pub async fn tab_new(b: State<'_, Browser>, webview: Webview, url: Option<String
     let engine = b.0.store.get("search_engine").unwrap_or_else(|| "google".into());
     let id = b.new_tab(url.filter(|u| !u.is_empty()).map(|u| palette::resolve(&u, &engine)), true)?;
     Ok(id)
+}
+
+/// Blue light filter level for Kite's own screens (`src/shared/theme.ts`).
+#[tauri::command]
+pub fn warm_get(b: State<'_, Browser>) -> u8 {
+    b.warm()
+}
+
+/// The tab strip's theme accent (split view boundary color). Sync: cheap.
+#[tauri::command]
+pub fn pane_color(b: State<'_, Browser>, color: String) {
+    b.set_pane_color(&color);
+}
+
+/// A bookmark clicked in the bookmark bar or side panel.
+#[tauri::command]
+pub async fn bookmark_open(b: State<'_, Browser>, webview: Webview, url: String) -> Result<(), AppError> {
+    b.touch(&webview);
+    b.open_bookmark(&url)
 }
 
 #[tauri::command]
@@ -456,22 +502,80 @@ pub async fn side_bookmarks(b: State<'_, Browser>) -> Result<SideBookmarks, AppE
 /// bookmark bar and the tab list (Chrome has the same on its bar). Picks come back through
 /// `on_menu_event` in `lib.rs` (ids `ctx:<action>`).
 #[tauri::command]
-pub async fn ui_menu(app: AppHandle, webview: Webview, x: f64, y: f64) -> Result<(), AppError> {
+pub async fn ui_menu(app: AppHandle, webview: Webview, x: f64, y: f64, tabs: Option<Vec<u64>>, tab: Option<u64>) -> Result<(), AppError> {
     use tauri::menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem};
     let b = app.state::<Browser>().inner().clone();
     b.touch(&webview);
     let err = |e: tauri::Error| AppError::new("메뉴를 열지 못했습니다.", e);
     let bar = b.0.store.get("bookmark_bar").as_deref() == Some("true");
-    let menu = Menu::with_items(
+    // On a tab (`tabs`: the selected tabs, or the one right-clicked): split view items. One tab
+    // that is not the active one pairs with the active tab (like Chrome's "new split view").
+    let win = crate::browser::win_of_label(webview.window().label()).unwrap_or(1);
+    let mut tabs: Vec<u64> = tabs.unwrap_or_default().into_iter().filter(|t| b.tab(*t).is_some_and(|x| x.win == win)).collect();
+    let split = b.split_of(win);
+    let in_split = tabs.iter().any(|t| split.contains(t));
+    if tabs.len() == 1 && let Some(a) = b.active().filter(|a| *a != tabs[0] && b.tab(*a).is_some_and(|x| x.win == win)) {
+        tabs.insert(0, a);
+    }
+    let can_split = tabs.len() >= 2 && !(in_split && tabs.iter().all(|t| split.contains(t)) && tabs.len() == split.len());
+    let label = if tabs.len() > crate::browser::SPLIT_MAX {
+        format!("분할 보기로 열기 (앞의 {}개 탭, 최대 4×4)", crate::browser::SPLIT_MAX)
+    } else {
+        format!("분할 보기로 열기 ({}개 탭)", tabs.len())
+    };
+    b.set_menu_tabs(tabs);
+    let tab = tab.filter(|t| b.tab(*t).is_some_and(|x| x.win == win));
+    b.set_menu_tab(tab);
+    let dup_item = MenuItem::with_id(&app, "ctx:duplicate_menu_tab", "탭 복제", true, Some("CmdOrCtrl+Shift+K")).map_err(err)?;
+    let split_item = MenuItem::with_id(&app, "ctx:split_view", label, can_split, None::<&str>).map_err(err)?;
+    let unsplit_item = MenuItem::with_id(&app, "ctx:unsplit", "분할 보기 해제", !split.is_empty(), None::<&str>).map_err(err)?;
+    // How the split view is arranged (also used for the next one in this window).
+    let l = b.split_layout_of(win);
+    use crate::browser::SplitLayout as L;
+    let layout_menu = tauri::menu::Submenu::with_items(
         &app,
+        "분할 배치",
+        true,
         &[
-            &CheckMenuItem::with_id(&app, "ctx:toggle_bookmark_bar", "북마크 바 표시", true, bar, Some("CmdOrCtrl+Shift+B")).map_err(err)?,
-            &CheckMenuItem::with_id(&app, "ctx:toggle_side_tabs", "세로 탭 목록 표시", true, b.side_open(), None::<&str>).map_err(err)?,
-            &PredefinedMenuItem::separator(&app).map_err(err)?,
-            &MenuItem::with_id(&app, "ctx:open_bookmarks", "북마크 관리자", true, None::<&str>).map_err(err)?,
-            &MenuItem::with_id(&app, "ctx:open_settings", "설정", true, None::<&str>).map_err(err)?,
+            &CheckMenuItem::with_id(&app, "ctx:split_grid", "격자", true, l == L::Grid, None::<&str>).map_err(err)?,
+            &CheckMenuItem::with_id(&app, "ctx:split_columns", "좌우로 나란히", true, l == L::Columns, None::<&str>).map_err(err)?,
+            &CheckMenuItem::with_id(&app, "ctx:split_stack", "위아래로 쌓기 (스택)", true, l == L::Stack, None::<&str>).map_err(err)?,
         ],
     )
+    .map_err(err)?;
+    let sep0 = PredefinedMenuItem::separator(&app).map_err(err)?;
+    // Blue light filter (eye comfort): off / low / medium / high.
+    let warm = b.warm();
+    let warm_menu = tauri::menu::Submenu::with_items(
+        &app,
+        "블루라이트 차단",
+        true,
+        &[
+            &CheckMenuItem::with_id(&app, "ctx:warm_0", "끄기", true, warm == 0, None::<&str>).map_err(err)?,
+            &CheckMenuItem::with_id(&app, "ctx:warm_1", "약하게", true, warm == 1, None::<&str>).map_err(err)?,
+            &CheckMenuItem::with_id(&app, "ctx:warm_2", "중간", true, warm == 2, None::<&str>).map_err(err)?,
+            &CheckMenuItem::with_id(&app, "ctx:warm_3", "강하게", true, warm == 3, None::<&str>).map_err(err)?,
+        ],
+    )
+    .map_err(err)?;
+    let sep_warm = PredefinedMenuItem::separator(&app).map_err(err)?;
+    let bar_item = CheckMenuItem::with_id(&app, "ctx:toggle_bookmark_bar", "북마크 바 표시", true, bar, Some("CmdOrCtrl+Shift+B")).map_err(err)?;
+    let side_item = CheckMenuItem::with_id(&app, "ctx:toggle_side_tabs", "세로 탭 목록 표시", true, b.side_open(), None::<&str>).map_err(err)?;
+    let sep1 = PredefinedMenuItem::separator(&app).map_err(err)?;
+    let bookmarks_item = MenuItem::with_id(&app, "ctx:open_bookmarks", "북마크 관리자", true, None::<&str>).map_err(err)?;
+    let settings_item = MenuItem::with_id(&app, "ctx:open_settings", "설정", true, None::<&str>).map_err(err)?;
+    let mut items: Vec<&dyn tauri::menu::IsMenuItem<tauri::Wry>> = Vec::new();
+    if tab.is_some() {
+        items.push(&dup_item);
+    }
+    if in_split || can_split {
+        items.extend([&split_item as &dyn tauri::menu::IsMenuItem<tauri::Wry>, &layout_menu, &unsplit_item]);
+    }
+    if tab.is_some() || in_split || can_split {
+        items.push(&sep0);
+    }
+    items.extend([&bar_item as &dyn tauri::menu::IsMenuItem<tauri::Wry>, &side_item, &sep1, &warm_menu, &sep_warm, &bookmarks_item, &settings_item]);
+    let menu = Menu::with_items(&app, &items)
     .map_err(err)?;
     let window = webview.window();
     app.run_on_main_thread(move || {
@@ -633,20 +737,20 @@ pub async fn palette_run(app: AppHandle, webview: Webview, kind: String, id: Str
             let tid: u64 = id.parse().map_err(|e| AppError::new("탭을 찾지 못했습니다.", e))?;
             b.activate(tid)?;
         }
-        _ => {
-            // bookmark / history / url / search: open the URL.
-            match b.active().and_then(|a| b.tab(a)).filter(|_| !new_tab) {
-                Some(t) => {
-                    b.navigate_url(t.id, &id)?;
-                    if let Some(wv) = b.webview(t.id) {
-                        let _ = wv.set_focus();
-                    }
-                }
-                None => {
-                    b.new_tab(Some(id), true)?;
+        // A bookmark opens in a new tab at the end (like the bookmark bar).
+        "bookmark" if !new_tab => b.open_bookmark(&id)?,
+        // history / url / search: open the URL.
+        _ => match b.active().and_then(|a| b.tab(a)).filter(|_| !new_tab) {
+            Some(t) => {
+                b.navigate_url(t.id, &id)?;
+                if let Some(wv) = b.webview(t.id) {
+                    let _ = wv.set_focus();
                 }
             }
-        }
+            None => {
+                b.new_tab(Some(id), true)?;
+            }
+        },
     }
     Ok(())
 }

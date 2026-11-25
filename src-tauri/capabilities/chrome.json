@@ -59,6 +59,10 @@
     "core:window:allow-close",
     "core:window:allow-is-maximized",
     "core:window:allow-start-resize-dragging",
-    "core:window:allow-set-background-color"
+    "core:window:allow-set-background-color",
+    "allow-favicons",
+    "allow-bookmark-open",
+    "allow-pane-color",
+    "allow-warm-get"
   ]
 }

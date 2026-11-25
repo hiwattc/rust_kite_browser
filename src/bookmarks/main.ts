@@ -4,6 +4,7 @@ import { icons } from "../shared/icons";
 import type { Bookmark } from "../shared/types";
 import "./bookmarks.css";
 import { initTheme } from "../shared/theme";
+import { loadIcons, savedIcon } from "../shared/favicons";
 
 initTheme();
 
@@ -69,14 +70,8 @@ function visible(): Bookmark[] {
   });
 }
 
-function favicon(u: string) {
-  try {
-    const x = new URL(u);
-    return /^https?:$/.test(x.protocol) ? `${x.origin}/favicon.ico` : "";
-  } catch {
-    return "";
-  }
-}
+/** Only icons kept while the site was open (never fetched from the bookmarked site). */
+const favicon = savedIcon;
 
 function host(u: string) {
   try {
@@ -167,7 +162,7 @@ function treeHtml(): string {
 function bookmarkRow(b: Bookmark) {
   return `<div class="bm" data-id="${b.id}">
         <span class="bm-ic">${favicon(b.url) ? `<img src="${esc(favicon(b.url))}" alt="" draggable="false" />` : icons.globe}</span>
-        <a class="bm-txt" href="${esc(b.url)}" title="${esc(b.url)}" draggable="false"><b>${esc(b.title || host(b.url))}</b><small>${esc(host(b.url))}</small></a>
+        <a class="bm-txt" href="${esc(b.url)}" target="_blank" rel="noopener" title="${esc(b.url)}" draggable="false"><b>${esc(b.title || host(b.url))}</b><small>${esc(host(b.url))}</small></a>
         <button class="ib" data-act="edit" title="편집">${icons.edit}</button>
         <button class="ib" data-act="del" title="삭제">${icons.trash}</button>
       </div>`;
@@ -768,6 +763,7 @@ async function load() {
   kept = (await call<string[]>("bookmark_folders")) ?? [];
   if (folder && folder !== BAR && !folders().includes(folder)) folder = null;
   render();
+  if (await loadIcons(all.map((b) => b.url))) render();
 }
 
 load();
